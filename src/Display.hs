@@ -9,10 +9,11 @@ import Graphics.Gloss.Interface.Pure.Display hiding (Color(..))
 import Tile
 
 displayTileMap :: Int -> TileMap -> IO ()
-displayTileMap res tm = display mode black
-  $ scaleToWindow
-  $ centerInWindow
-  $ renderTileMap tm
+displayTileMap res tm = do
+  display mode black
+    $ scaleToWindow
+    $ centerInWindow
+    $ renderTileMap tm
   where
   (h,v) = tileMapDimensions tm
 
@@ -20,8 +21,8 @@ displayTileMap res tm = display mode black
   sc = availRes / max h v
   scaleToWindow = scale sc sc
 
-  dx = -(h/2)
-  dy = v/2
+  dx = -(v/2)
+  dy = h/2
   centerInWindow = translate dx dy
 
   mode = InWindow "gloss" (res,res) (0,0)
