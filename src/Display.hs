@@ -79,7 +79,7 @@ tileMapDimensions cfg tm = (horiz,vert)
   vert  = (tileSize cfg * c') + (tileSpacing cfg * (c' - 1))
 
 data TileSetConfig = TileSetConfig
-  { pixels       :: Float
+  { tileWidth    :: Float
   , textureFiles :: [FilePath]
   , fileChoice   :: FileChoice
   } deriving (Eq,Show)
@@ -103,7 +103,7 @@ loadDefaultTileSet cfg = do
   let ts = TileSet $
          M.fromList $ zip [ TileIndex i | i <- [0..] ] $
            zip tiles textures
-  return (ts, defaultRenderConfig { tileSize = pixels cfg })
+  return (ts, defaultRenderConfig { tileSize = tileWidth cfg })
   where
   tiles =
     [ mkTile Red   Green Blue   Yellow
