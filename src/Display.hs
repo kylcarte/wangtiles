@@ -1,10 +1,12 @@
 
 module Display where
 
+import Control.Monad
 import qualified Data.Array as A
 import qualified Data.Map as M
 import Graphics.Gloss hiding (Color)
 import qualified Graphics.Gloss as G
+import System.Exit
 
 import Tile
 
@@ -76,18 +78,32 @@ tileMapDimensions cfg tm = (horiz,vert)
   horiz = (tileSize cfg * r') + (tileSpacing cfg * (r' - 1))
   vert  = (tileSize cfg * c') + (tileSpacing cfg * (c' - 1))
 
--- given a number of required textures, return a tile size (in pixels)
---   and a list of files from which to load the textures
-type TextureTemplate = Int -> IO (Float,[FilePath])
+data TileSetConfig = TileSetConfig
+  { pixels       :: Float
+  , textureFiles :: [FilePath]
+  , fileChoice   :: FileChoice
+  } deriving (Eq,Show)
 
-loadDefaultTileSet :: TextureTemplate -> IO (TileSet,RenderConfig)
-loadDefaultTileSet texTemplate = do
-  (tSize,files) <- texTemplate $ length tiles
-  textures <- mapM loadBMP files
+data FileChoice
+  = OrderedChoice
+  | RandomChoice
+  deriving (Eq,Show)
+
+loadDefaultTileSet :: TileSetConfig -> IO (TileSet,RenderConfig)
+loadDefaultTileSet cfg = do
+  let setSize = length $ textureFiles cfg
+  unless (setSize >= length tiles) $ do
+    putStrLn $ "Insufficient texture set size: " ++ show setSize
+    exitFailure
+  let chooseFiles = case fileChoice cfg of
+        OrderedChoice -> return
+        RandomChoice  -> choose (length tiles)
+  use <- chooseFiles $ textureFiles cfg
+  textures <- mapM loadBMP use
   let ts = TileSet $
          M.fromList $ zip [ TileIndex i | i <- [0..] ] $
            zip tiles textures
-  return (ts, defaultRenderConfig { tileSize = tSize })
+  return (ts, defaultRenderConfig { tileSize = pixels cfg })
   where
   tiles =
     [ mkTile Red   Green Blue   Yellow

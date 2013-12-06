@@ -1,2 +1,2 @@
 Usage:
-  $ wangtiles <rows> <cols>
+  $ wangtiles <dungeon|tubesocks> <rows> <cols>

@@ -15,26 +15,34 @@ tileSetDirectory = "data"
 
 -- Tile set data -------------------------------------------------------------
 
-tileSets :: M.Map String TextureTemplate
+tileSets :: M.Map String TileSetConfig
 tileSets = M.fromList
-  [ ( "dungeon"   , dungeonTmpl   )
-  , ( "tubesocks" , tubesocksTmpl )
+  [ ( "dungeon"   , dungeon   )
+  , ( "tubesocks" , tubesocks )
   ]
 
-dungeonTmpl :: TextureTemplate
-dungeonTmpl n = return (16,files)
+dungeon :: TileSetConfig
+dungeon = TileSetConfig
+  { pixels       = 16
+  , textureFiles = files
+  , fileChoice   = OrderedChoice
+  }
   where
   files =
     [ tileSetDirectory </> "dungeon/wng-" ++ i <.> "bmp"
-    | i <- map show [0..n-1]
+    | i <- map show [0..7]
     ]
 
-tubesocksTmpl :: TextureTemplate
-tubesocksTmpl n = (,) 32 <$> choose n files
+tubesocks :: TileSetConfig
+tubesocks = TileSetConfig
+  { pixels       = 32
+  , textureFiles = files
+  , fileChoice   = RandomChoice
+  }
   where
   files =
     [ tileSetDirectory </> "tubesocks/wang" ++ s <.> "bmp"
-    | i <- map show [0..n-1]
+    | i <- map show [0..13]
     , let s = case i of
                 [_] -> '0' : i
                 _   -> i
@@ -56,7 +64,7 @@ usage = do
   where
   allSets = intercalate "|" $ M.keys tileSets
 
-lookupSet :: String -> IO TextureTemplate
+lookupSet :: String -> IO TileSetConfig
 lookupSet s = case M.lookup s tileSets of
   Just tmpl -> return tmpl
   Nothing   -> do putStrLn $ "Error: unknown tile set '" ++ s ++ "'"
@@ -65,8 +73,7 @@ lookupSet s = case M.lookup s tileSets of
 main :: IO ()
 main = do
   (set,r,c) <- parseArgs
-  tmpl      <- lookupSet set
-  (ts,cfg)  <- loadDefaultTileSet tmpl
+  (ts,cfg)  <- loadDefaultTileSet =<< lookupSet set
   tm <- ioWangTileMap ts (r,c)
   displayTileMap cfg tm
 
