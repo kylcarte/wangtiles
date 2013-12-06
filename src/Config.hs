@@ -43,11 +43,11 @@ configureTileSet n m tsm = do
   tw  <- getField "tile-width"
   r   <- getField "random"
   tsg <- getField "textures"
-  ts  <- sort <$> glob tsg
+  ts  <- glob tsg
   let conf = TileSetConfig
                { tileWidth = tw
-               , textureFiles = ts
-               , fileChoice = if r then RandomChoice else OrderedChoice
+               , textureFiles = if r then ts else sort ts
+               , fileChoice   = if r then RandomChoice else OrderedChoice
                }
   return $ M.insert n conf tsm
   where
