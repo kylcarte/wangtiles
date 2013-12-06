@@ -6,14 +6,14 @@ module Tile where
 import Control.Applicative
 import Control.Arrow (first)
 import Control.Monad
-import Control.Monad.Trans.Class
 import Control.Monad.Trans.State
-import Control.Monad.Trans.Writer
-import Data.Default
+import Data.List (delete)
 import qualified Data.Map as M
 import qualified Data.Array as A
 import qualified System.Random as R
-import System.Random (RandomGen(..),StdGen(..))
+import System.Random (RandomGen(..))
+
+import Graphics.Gloss.Data.Picture
 
 data Color
   = Red
@@ -35,16 +35,18 @@ constraints :: [(Edge,Color)] -> Constraints
 constraints = M.fromList
 
 data Tile = Tile
-  { tColors :: A.Array Edge Color
+  { tColors  :: A.Array Edge Color
   } deriving (Eq,Show)
 
 mkTile :: Color -> Color -> Color -> Color -> Tile
-mkTile n s w e = Tile $ A.array (minBound,maxBound)
-  [ ( North , n )
-  , ( South , s )
-  , ( West  , w )
-  , ( East  , e )
-  ]
+mkTile n s w e = Tile
+  { tColors = A.array (minBound,maxBound)
+      [ ( North , n )
+      , ( South , s )
+      , ( West  , w )
+      , ( East  , e )
+      ]
+  }
 
 edgeColor :: Tile -> Edge -> Color
 edgeColor t e = tColors t A.! e
@@ -72,10 +74,10 @@ gridContents = A.assocs . fromGrid
 
 newtype TileIndex = TileIndex
   { tileIndex :: Int
-  } deriving (Eq,Ord,Show,A.Ix,R.Random,Default)
+  } deriving (Eq,Ord,Show,A.Ix,R.Random)
 
-newtype TileSet = TileSet
-  { fromTileSet :: M.Map TileIndex Tile
+data TileSet = TileSet
+  { tileTypes    :: M.Map TileIndex (Tile,Picture)
   } deriving (Eq,Show)
 
 data TileMap = TileMap
@@ -92,14 +94,21 @@ satisfies cs t = M.foldlWithKey f True cs
 selectTiles :: Constraints -> TileSet -> TileSet
 selectTiles cs ts = TileSet $ M.fromList suitables
   where
-  allTiles  = M.assocs $ fromTileSet ts
-  suitables = filter (satisfies cs . snd) allTiles
+  allTiles  = M.assocs $ tileTypes ts
+  suitables = filter sat allTiles
+  sat (_,(t,_)) = satisfies cs t
 
 (!) :: TileMap -> Coord -> TileIndex
 tm ! i = fromGrid (tileMap tm) A.! i
 
 tileIn :: TileSet -> TileIndex -> Tile
-tileIn ts i = fromTileSet ts M.! i
+tileIn ts i = fst $ tileTexture ts i
+
+textureIn :: TileSet -> TileIndex -> Picture
+textureIn ts i = snd $ tileTexture ts i
+
+tileTexture :: TileSet -> TileIndex -> (Tile,Picture)
+tileTexture ts i = tileTypes ts M.! i
 
 (//) :: TileMap -> [(Coord,TileIndex)] -> TileMap
 tm // ts = tm { tileMap = Grid $ fromGrid (tileMap tm) A.// ts }
@@ -107,24 +116,11 @@ tm // ts = tm { tileMap = Grid $ fromGrid (tileMap tm) A.// ts }
 update :: Coord -> TileIndex -> TileMap -> TileMap
 update xy t tm = tm // [(xy,t)]
 
-instance Default TileSet where
-  def = TileSet
-    $ M.fromList $ zip [ TileIndex i | i <- [0..7] ]
-    [ mkTile Red   Green Blue   Yellow
-    , mkTile Green Green Blue   Blue  
-    , mkTile Red   Red   Yellow Yellow
-    , mkTile Green Red   Yellow Blue  
-    , mkTile Red   Green Yellow Blue  
-    , mkTile Green Green Yellow Yellow
-    , mkTile Red   Red   Blue   Blue  
-    , mkTile Green Red   Blue   Yellow
-    ]
-
 mkDefaultTileMap :: TileSet -> Size -> TileMap
 mkDefaultTileMap ts sz = TileMap 
   { tileMap = Grid
       $ A.listArray ((0,0),sz)
-      $ repeat def
+      $ repeat $ TileIndex 0
   , tileSet = ts
   }
 
@@ -143,11 +139,7 @@ edgeColorAt c e tm = edgeColor t e
 
 updateTile :: TileMap -> Coord -> Random TileMap
 updateTile tm c@(row,col) = do
-  -- msg $ "Constraints of " ++ show c ++ " are " ++ show csl
-  -- msg $ "Possible tiles are " ++ show suitable
   i <- randomTileIndex suitable
-  -- msg $ "Updating tile to " ++ show (tileIn ts i)
-  -- msg ""
   return $ update c i tm
   where
   leftOf = (row,col-1)
@@ -163,12 +155,11 @@ updateTile tm c@(row,col) = do
 ioWangTileMap :: TileSet -> Size -> IO TileMap
 ioWangTileMap ts sz = do
   g <- R.getStdGen
-  let ((tm,msgs),g') = mkWangTileMap ts sz g
+  let (tm,g') = mkWangTileMap ts sz g
   R.setStdGen g'
-  mapM_ putStrLn msgs
   return tm
 
-mkWangTileMap :: RandomGen g => TileSet -> Size -> g -> ((TileMap,[String]),g)
+mkWangTileMap :: RandomGen g => TileSet -> Size -> g -> (TileMap,g)
 mkWangTileMap ts (r,c) g = runRandom g $ randomWangTileMap ts (r-1,c-1)
 
 randomWangTileMap :: TileSet -> Size -> Random TileMap
@@ -180,7 +171,7 @@ randomWangTileMap ts sz@(rs,cs) = foldM updateTile initialTm coords
 -- Random {{{
 
 newtype Random a = Random
-  { unRandom :: RandomGen g => WriterT [String] (State g) a
+  { unRandom :: RandomGen g => State g a
   }
 
 instance Functor Random where
@@ -191,24 +182,16 @@ instance Applicative Random where
   (<*>) = ap
 
 instance Monad Random where
-  return a = Random $ lift $ state $ \g -> (a,g)
+  return a = Random $ state $ \g -> (a,g)
   (Random m) >>= f = Random $ m >>= unRandom . f
 
-runRandom :: RandomGen g => g -> Random a -> ((a,[String]),g)
-runRandom g m = runState (runWriterT $ unRandom m) g
+runRandom :: RandomGen g => g -> Random a -> (a,g)
+runRandom g m = runState (unRandom m) g
 
 -- Key functions
 
-randomTile :: TileSet -> Random Tile
-randomTile = randomVal . fromTileSet
-
 randomTileIndex :: TileSet -> Random TileIndex
-randomTileIndex = randomKey . fromTileSet
-
-randomVal :: (Ord k) => M.Map k a -> Random a
-randomVal m = do
-  k <- randomKey m
-  return $ m M.! k
+randomTileIndex = randomKey . tileTypes
 
 randomKey :: (Ord k) => M.Map k a -> Random k
 randomKey m = rnd $ first (ks !!) . R.randomR (0,n)
@@ -217,10 +200,16 @@ randomKey m = rnd $ first (ks !!) . R.randomR (0,n)
   n = length ks - 1
 
 rnd :: (forall g. RandomGen g => g -> (a,g)) -> Random a
-rnd f = Random $ lift $ state f
-
-msg :: String -> Random ()
-msg s = Random $ tell [s]
+rnd f = Random $ state f
 
 -- }}}
+
+choose :: Eq a => Int -> [a] -> IO [a]
+choose _ [] = return []
+choose 0 _  = return []
+choose n as = do
+  i <- R.randomRIO (0,length as - 1)
+  let a = as !! i
+  as' <- choose (n-1) (delete a as)
+  return $ a : as'
 

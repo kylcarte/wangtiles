@@ -2,22 +2,22 @@
 module Display where
 
 import qualified Data.Array as A
-import Graphics.Gloss hiding (Color(..))
+import qualified Data.Map as M
+import Graphics.Gloss hiding (Color)
 import qualified Graphics.Gloss as G
-import Graphics.Gloss.Interface.Pure.Display hiding (Color(..))
 
 import Tile
 
-displayTileMap :: Int -> TileMap -> IO ()
-displayTileMap res tm = do
-  display mode black
+displayTileMap :: RenderConfig -> TileMap -> IO ()
+displayTileMap cfg tm = do
+  display mode (windowBackground cfg)
     $ scaleToWindow
     $ centerInWindow
-    $ renderTileMap tm
+    $ renderTileMap cfg tm
   where
-  (h,v) = tileMapDimensions tm
+  (h,v) = tileMapDimensions cfg tm
 
-  availRes = toEnum res - (2 * screenBorder)
+  availRes = toEnum (screenSize cfg) - (2 * screenBorder cfg)
   sc = availRes / max h v
   scaleToWindow = scale sc sc
 
@@ -25,73 +25,106 @@ displayTileMap res tm = do
   dy = h/2
   centerInWindow = translate dx dy
 
+  res = screenSize cfg
   mode = InWindow "gloss" (res,res) (0,0)
 
-renderTileMap :: TileMap -> Picture
-renderTileMap tm = moveToOrigin pic
+renderTileMap :: RenderConfig -> TileMap -> Picture
+renderTileMap cfg tm = moveToOrigin pic
   where
   ts = tileSet tm
   cis = gridContents $ tileMap tm
-  cts = map (fmap $ tileIn ts) cis
-  pic = pictures $ map (uncurry renderTile) cts
-  moveToOrigin = translate tileRadius (-tileRadius)
+  ctps = map (fmap $ tileTexture ts) cis
+  pic = pictures $ map render ctps
+  moveToOrigin = translate (tileRadius cfg) (-(tileRadius cfg))
+  render (c,tp) = moveTileToCoord cfg c $ renderTile cfg tp
 
-renderTile :: Coord -> Tile -> Picture
-renderTile (r,c) (Tile cs) = moveToCoord
-  $ pictures
-    [ bg
-    , edges
-    ]
+moveTileToCoord :: RenderConfig -> Coord -> Picture -> Picture
+moveTileToCoord cfg (r,c) = translate (toEnum c * k) (-(toEnum r * k))
   where
-  bg = color tileBackground $ rectangleSolid tileSize tileSize
-  border = color black $ rectangleWire tileSize tileSize
-  edges = pictures $ map renderEdge $ A.assocs cs
+  k = (tileSize cfg) + (tileSpacing cfg)
 
-  k = tileSize + tileSpacing
-  moveToCoord = translate (toEnum c * k) (-(toEnum r * k))
-
-renderEdge :: (Edge,Color) -> Picture
-renderEdge (e,c) = moveToEdge $ colorRec rec
+renderTile :: RenderConfig -> (Tile,Picture) -> Picture
+renderTile cfg (t,texture) = pictures
+  [ if renderTexture cfg then texture else blank
+  , if renderEdges   cfg then edges   else blank
+  ]
   where
-  rec = rectangleUpperSolid edgeWidth edgeWeight
-  colorRec = color $ case c of
+  edges = pictures $ map (renderEdge cfg) $ A.assocs $ tColors t
+
+renderEdge :: RenderConfig -> (Edge,Color) -> Picture
+renderEdge cfg (e,c) = moveToEdge $ colorEdge shape
+  where
+  shape = arcSolid 0 180 $ edgeRadius cfg
+  -- rec = rectangleUpperSolid edgeWidth edgeWeight
+  colorEdge = color $ case c of
     Red    -> red
     Green  -> green
     Yellow -> yellow
     Blue   -> blue
   moveToEdge = case e of
-    North -> translate 0 tileRadius    . rotate 180
-    South -> translate 0 (-tileRadius)
-    West  -> translate (-tileRadius) 0 . rotate 90
-    East  -> translate tileRadius    0 . rotate (-90)
+    North -> translate 0 (tileRadius cfg)    . rotate 180
+    South -> translate 0 (-(tileRadius cfg))
+    West  -> translate (-(tileRadius cfg)) 0 . rotate 90
+    East  -> translate (tileRadius cfg)    0 . rotate (-90)
 
-tileMapDimensions :: TileMap -> (Float,Float)
-tileMapDimensions tm = (horiz,vert)
+tileMapDimensions :: RenderConfig -> TileMap -> (Float,Float)
+tileMapDimensions cfg tm = (horiz,vert)
   where
   (r,c) = gridSize $ tileMap tm
   r' = toEnum r
   c' = toEnum c
-  horiz = (tileSize * r') + (tileSpacing * (r' - 1))
-  vert  = (tileSize * c') + (tileSpacing * (c' - 1))
+  horiz = (tileSize cfg * r') + (tileSpacing cfg * (r' - 1))
+  vert  = (tileSize cfg * c') + (tileSpacing cfg * (c' - 1))
 
-tileRadius :: Float
-tileRadius = 20
+-- given a number of required textures, return a tile size (in pixels)
+--   and a list of files from which to load the textures
+type TextureTemplate = Int -> IO (Float,[FilePath])
 
-tileSpacing :: Float
-tileSpacing = 0
+loadDefaultTileSet :: TextureTemplate -> IO (TileSet,RenderConfig)
+loadDefaultTileSet texTemplate = do
+  (tSize,files) <- texTemplate $ length tiles
+  textures <- mapM loadBMP files
+  let ts = TileSet $
+         M.fromList $ zip [ TileIndex i | i <- [0..] ] $
+           zip tiles textures
+  return (ts, defaultRenderConfig { tileSize = tSize })
+  where
+  tiles =
+    [ mkTile Red   Green Blue   Yellow
+    , mkTile Green Green Blue   Blue  
+    , mkTile Red   Red   Yellow Yellow
+    , mkTile Green Red   Yellow Blue  
+    , mkTile Red   Green Yellow Blue  
+    , mkTile Green Green Yellow Yellow
+    , mkTile Red   Red   Blue   Blue  
+    , mkTile Green Red   Blue   Yellow
+    ]
 
-edgeWeight :: Float
-edgeWeight = 4
+data RenderConfig = RenderConfig
+  { tileSize         :: Float
+  , tileSpacing      :: Float
+  , edgeRadius       :: Float
+  , screenBorder     :: Float
+  , screenSize       :: Int
+  , tileBackground   :: G.Color
+  , windowBackground :: G.Color
+  , renderEdges      :: Bool
+  , renderTexture    :: Bool
+  } deriving (Eq,Show)
 
-screenBorder :: Float
-screenBorder = 20
+defaultRenderConfig :: RenderConfig
+defaultRenderConfig = RenderConfig
+  { tileSize         = 16
+  , tileSpacing      = 0
+  , edgeRadius       = 4
+  , screenBorder     = 20
+  , screenSize       = 600
+  , tileBackground   = white
+  , windowBackground = white
+  , renderEdges      = False
+  , renderTexture    = True
+  }
 
-tileSize :: Float
-tileSize = 2 * tileRadius
-
-edgeWidth :: Float
-edgeWidth = tileSize - (2 * edgeWeight + 4)
-
-tileBackground :: G.Color
-tileBackground = white
+tileRadius :: RenderConfig -> Float
+tileRadius cfg = tileSize cfg / 2
 
