@@ -1,20 +1,14 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Display
-import Tile
-import Config
+import Display.Wang
+import Tile.Wang
+import Config.TileSet
+import Config.TileSet.Wang
 
-import Control.Applicative
-import Data.Configurator
 import Data.Configurator.Types
-import qualified Data.HashMap.Strict as H
-import Data.List (intercalate)
 import qualified Data.Text as T
-import Graphics.Gloss
 import System.Environment
 import System.Exit
-import System.FilePath
-import qualified Data.Map as M
 
 parseArgs :: IO (Name,Int,Int)
 parseArgs = do
@@ -30,9 +24,9 @@ usage = do
 
 main :: IO ()
 main = do
-  tsm <- buildTileSetMap "data/tilesets.conf"
+  tsm <- loadTileSetMap "data/tilesets.conf"
   (set,r,c) <- parseArgs
-  (ts,cfg)  <- loadDefaultTileSet =<< lookupSet set tsm
+  (ts,cfg)  <- loadWangTileSet wangTiles2x2 =<< lookupSet set tsm
   tm <- ioWangTileMap ts (r,c)
-  displayTileMap cfg tm
+  displayTileMap cfg ts tm
 
