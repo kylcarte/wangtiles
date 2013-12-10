@@ -18,6 +18,7 @@ cabal-version:       >=1.10
 library
   exposed-modules:     Tile
                        Tile.Wang
+                       Display
                        Display.Wang
                        Config.Render
                        Config.Render.Wang
@@ -63,6 +64,7 @@ executable wangtiles
                        gloss                >=1.8,
                        gloss-juicy          >=0.1,
                        JuicyPixels          >=3.1,
+                       pretty-show          >=1.6,
                        random               >=1.0,
                        text                 >=0.11,
                        transformers         >=0.3,

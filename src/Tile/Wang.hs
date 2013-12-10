@@ -4,15 +4,53 @@
 module Tile.Wang where
 
 import Control.Monad
-import qualified Data.IntMap as I
 import qualified Data.Set as S
-import qualified Data.Array as A
+import qualified Data.Map as M
 import qualified System.Random as R
 import System.Random (RandomGen(..))
 
 import Graphics.Gloss.Data.Picture
+import qualified Graphics.Gloss.Data.Color as Gloss
 import Tile
 import Util
+
+-- Tiles {{{
+
+wangTiles2x2 :: TileSet Tile
+wangTiles2x2 = mkTiles
+  [ ( Red   , Green , Blue   , Yellow )
+  , ( Green , Green , Blue   , Blue   )
+  , ( Red   , Red   , Yellow , Yellow )
+  , ( Green , Red   , Yellow , Blue   )
+  , ( Red   , Green , Yellow , Blue   )
+  , ( Green , Green , Yellow , Yellow )
+  , ( Red   , Red   , Blue   , Blue   )
+  , ( Green , Red   , Blue   , Yellow )
+  ]
+
+wangTiles2x3 :: TileSet Tile
+wangTiles2x3 = mkTiles
+  [ ( Red   , Green , Blue   , Yellow )
+  , ( Green , Red   , Blue   , Yellow )
+  , ( Red   , Red   , Yellow , Blue   )
+  , ( Green , Green , Yellow , Red    )
+  , ( Red   , Green , Red    , Yellow )
+  , ( Green , Red   , Red    , Blue   )
+  , ( Red   , Green , Blue   , Red    )
+  , ( Red   , Red   , Blue   , Red    )
+  , ( Green , Red   , Yellow , Red    )
+  , ( Red   , Green , Yellow , Blue   )
+  , ( Green , Green , Red    , Blue   )
+  , ( Green , Red   , Red    , Yellow )
+  ]
+
+-- }}}
+
+-- Tile {{{
+
+data Tile = Tile
+  { tColors :: M.Map Edge Color
+  } deriving (Eq,Show)
 
 data Color
   = Red
@@ -26,7 +64,42 @@ data Edge
   | South
   | West
   | East
-  deriving (Eq,Ord,Show,A.Ix,Enum,Bounded)
+  deriving (Eq,Ord,Show,Enum,Bounded)
+
+mkTile :: Color -> Color -> Color -> Color -> Tile
+mkTile n s w e = Tile $ M.fromList
+  [ ( North , n )
+  , ( South , s )
+  , ( West  , w )
+  , ( East  , e )
+  ]
+
+mkTiles :: [(Color,Color,Color,Color)] -> TileSet Tile
+mkTiles = tsFromList . zip [0..] . map (uncurry4 mkTile)
+
+tileColors :: Tile -> [(Edge,Color)]
+tileColors = M.assocs . tColors
+
+edgeColor :: Tile -> Edge -> Color
+edgeColor t e = tColors t M.! e
+
+edgeAxis :: a -> a -> Edge -> a
+edgeAxis ns we e = case e of
+  North -> ns
+  South -> ns
+  West  -> we
+  East  -> we
+
+glossColor :: Color -> Gloss.Color
+glossColor c = case c of
+  Red    -> Gloss.red
+  Green  -> Gloss.green
+  Yellow -> Gloss.yellow
+  Blue   -> Gloss.blue
+
+-- }}}
+
+-- Constraint {{{
 
 data Constraint
   = ConstrainEdge Edge Color
@@ -37,25 +110,6 @@ type Constraints = S.Set Constraint
 colorConstraints :: [(Edge,Color)] -> Constraints
 colorConstraints = S.fromList . map (uncurry ConstrainEdge)
 
-type WangTileSet = I.IntMap (Picture,Tile)
-
-data Tile = Tile
-  { tColors  :: A.Array Edge Color
-  } deriving (Eq,Show)
-
-mkTile :: Color -> Color -> Color -> Color -> Tile
-mkTile n s w e = Tile
-  { tColors = A.array (minBound,maxBound)
-      [ ( North , n )
-      , ( South , s )
-      , ( West  , w )
-      , ( East  , e )
-      ]
-  }
-
-edgeColor :: Tile -> Edge -> Color
-edgeColor t e = tColors t A.! e
-
 satisfies :: Constraints -> Tile -> Bool
 satisfies cs t = S.foldl sat True cs
   where
@@ -63,11 +117,17 @@ satisfies cs t = S.foldl sat True cs
   sat _ (ConstrainEdge e c) = edgeColor t e == c
 
 selectTiles :: Constraints -> WangTileSet -> WangTileSet
-selectTiles cs ts = I.fromList suitables
+selectTiles cs ts = tsFromList suitables
   where
-  allTiles  = I.assocs ts
+  allTiles  = tsAssocs ts
   suitables = filter sat allTiles
   sat (_,(_,t)) = satisfies cs t
+
+-- }}}
+
+-- WangTileSet {{{
+
+type WangTileSet = TileSet (Picture,Tile)
 
 textureIn :: WangTileSet -> TileIndex -> Picture
 textureIn ts i = fst $ tileTexture ts i
@@ -76,18 +136,25 @@ tileIn :: WangTileSet -> TileIndex -> Tile
 tileIn ts i = snd $ tileTexture ts i
 
 tileTexture :: WangTileSet -> TileIndex -> (Picture,Tile)
-tileTexture ts i = ts I.! i
+tileTexture ts i = tsIndex ts i
+
+randomTileIndex :: WangTileSet -> Random TileIndex
+randomTileIndex = tsRandomKey
+
+-- }}}
+
+-- TileMap {{{
 
 edgeColorAt :: WangTileSet -> Coord -> Edge -> TileMap -> Color
 edgeColorAt ts c e tm = edgeColor t e
   where
-  ti = tm ! c
+  ti = tmIndex tm c
   t  = tileIn ts ti
 
 updateTile :: WangTileSet -> TileMap -> Coord -> Random TileMap
 updateTile ts tm c@(row,col) = do
   i <- randomTileIndex suitable
-  return $ update c i tm
+  return $ tmUpdate1 c i tm
   where
   leftOf = (row,col-1)
   above  = (row-1,col)
@@ -106,27 +173,13 @@ ioWangTileMap ts sz = do
   return tm
 
 mkWangTileMap :: RandomGen g => WangTileSet -> Size -> g -> (TileMap,g)
-mkWangTileMap ts (r,c) g = runRandom g $ randomWangTileMap ts (r-1,c-1)
+mkWangTileMap ts sz g = runRandom g $ randomWangTileMap ts sz
 
 randomWangTileMap :: WangTileSet -> Size -> Random TileMap
 randomWangTileMap ts sz@(rs,cs) = foldM (updateTile ts) initialTm coords
   where
   coords = [ (r,c) | r <- [0..rs], c <- [0..cs] ]
-  initialTm = mkDefaultTileMap sz
+  initialTm = mkEmptyTileMap sz
 
-randomTileIndex :: WangTileSet -> Random TileIndex
-randomTileIndex = randomKey
-
-wangTiles2x2 :: [Tile]
-wangTiles2x2 =
-  [ mkTile Red   Green Blue   Yellow
-  , mkTile Green Green Blue   Blue  
-  , mkTile Red   Red   Yellow Yellow
-  , mkTile Green Red   Yellow Blue  
-  , mkTile Red   Green Yellow Blue  
-  , mkTile Green Green Yellow Yellow
-  , mkTile Red   Red   Blue   Blue  
-  , mkTile Green Red   Blue   Yellow
-  ]
-
+-- }}}
 

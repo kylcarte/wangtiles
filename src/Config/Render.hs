@@ -12,11 +12,11 @@ import Graphics.Gloss.Data.Color
 import qualified Data.Text as T
 
 data RenderConfig = RenderConfig
-  { tileSpacing      :: Float
-  , screenBorder     :: Float
-  , screenSize       :: Int
-  , windowBackground :: Color
-  , renderTexture    :: Bool
+  { tileSpacing       :: Float
+  , screenBorder      :: Float
+  , screenSize        :: Int
+  , windowBackground  :: Color
+  , tileRenderTexture :: Bool
   } deriving (Eq,Show)
 
 instance FromJSON RenderConfig where
@@ -31,11 +31,11 @@ instance FromJSON RenderConfig where
 
 defaultRenderConfig :: RenderConfig
 defaultRenderConfig = RenderConfig
-  { tileSpacing      = 0
-  , screenBorder     = 20
-  , screenSize       = 600
-  , windowBackground = white
-  , renderTexture    = True
+  { tileSpacing       = 0
+  , screenBorder      = 20
+  , screenSize        = 600
+  , windowBackground  = white
+  , tileRenderTexture = True
   }
 
 hexDigitToInt :: Char -> Int

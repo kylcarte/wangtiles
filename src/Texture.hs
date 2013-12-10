@@ -5,20 +5,33 @@ module Texture where
 
 import Tile
 import Util
+import Config.TileSet
 
+import Data.Maybe (catMaybes)
 import qualified Data.Map as M
+import Data.Text (Text)
 import qualified Data.Traversable as T
 import Codec.Picture
 import Graphics.Gloss
 import Graphics.Gloss.Juicy
 
-loadTextureMap :: (Int,Int) -> FilePath -> IO (M.Map (Int,Int) Picture)
-loadTextureMap xy f = readImage f >>= renderAndMap
+loadTextureFromSets :: TileSets -> Text -> IO (TileSetConfig,TileSet Picture)
+loadTextureFromSets tss n = do
+  tsc <- lookupTileSetConfig n tss
+  tm <- loadTextureMap tsc
+  return (tsc,tm)
+
+loadTextureMap :: TileSetConfig -> IO (TileSet Picture)
+loadTextureMap cfg = readImage (textureFile cfg) >>= splitAndRender
   where
-  renderAndMap = either fail $ return
-    . mkGridMap
+  splitAndRender = either fail $ return
+    . tsFromList
+    . flattenAndIndex
     . map (map fromDynamicImage)
-    . splitImage xy
+    . deleteGridIndices (ignoreTiles cfg)
+    . splitImage (tileSize cfg)
+  flattenAndIndex :: [[Maybe a]] -> [(Int,a)]
+  flattenAndIndex = zip [0..] . catMaybes . concat
 
 mkTextureMap :: M.Map (Int,Int) Picture
   -> TileSet (Int,Int)

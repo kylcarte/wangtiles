@@ -1,9 +1,8 @@
-{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE RankNTypes #-}
 
 module Util where
 
 import Control.Applicative
-import Control.Arrow (first)
 import Control.Monad
 import Control.Monad.Trans.State
 import Data.Aeson
@@ -32,27 +31,32 @@ instance Monad Random where
   return a = Random $ state $ \g -> (a,g)
   (Random m) >>= f = Random $ m >>= unRandom . f
 
+runRandomIO :: Random a -> IO a
+runRandomIO m = do
+  g <- R.getStdGen
+  let (a,g') = runRandom g m
+  R.setStdGen g'
+  return a
+
 runRandom :: RandomGen g => g -> Random a -> (a,g)
 runRandom g m = runState (unRandom m) g
 
 -- Key functions
 
 randomKey :: I.IntMap a -> Random Int
-randomKey m = rnd $ first (ks !!) . R.randomR (0,n)
+randomKey m = (ks !!) <$> randomR (0,n)
   where
   ks = I.keys m
   n  = length ks - 1
 
-{-
-randomKey :: (Ord k) => M.Map k a -> Random k
-randomKey m = rnd $ first (ks !!) . R.randomR (0,n)
-  where
-  ks = M.keys m
-  n = length ks - 1
--}
-
 rnd :: (forall g. RandomGen g => g -> (a,g)) -> Random a
 rnd f = Random $ state f
+
+random :: R.Random a => Random a
+random = rnd $ R.random
+
+randomR :: R.Random a => (a,a) -> Random a
+randomR rng = rnd $ R.randomR rng
 
 -- }}}
 
@@ -64,6 +68,29 @@ choose n as = do
   let a = as !! i
   as' <- choose (n-1) (delete a as)
   return $ a : as'
+
+groupIndices :: [(Int,Int)] -> I.IntMap [Int]
+groupIndices = foldr f I.empty
+  where
+  f (x,y) = I.alter (g y) x
+  g y Nothing   = Just [y]
+  g y (Just ys) = Just $ y:ys
+
+deleteGridIndices :: [(Int,Int)] -> [[a]] -> [[a]]
+deleteGridIndices is rs =
+  [ deleteIndices (I.lookup i im) r
+  | (r,i) <- zip rs [0..]
+  ]
+  where
+  im = groupIndices is
+
+deleteIndices :: Maybe [Int] -> [a] -> [a]
+deleteIndices Nothing   as = as
+deleteIndices (Just is) as =
+  [ a
+  | (a,i) <- zip as [0..]
+  , i `notElem` is
+  ]
 
 mkIndexMap :: [[Maybe Int]] -> I.IntMap (Int,Int)
 mkIndexMap rs = I.fromList
@@ -91,4 +118,15 @@ tzip = tzipWith (,)
 
 decodeFile :: FromJSON a => FilePath -> IO a
 decodeFile f = either fail return . eitherDecode =<< BS.readFile f
+
+onPair :: (a -> b) -> (a,a) -> (b,b)
+onPair f (x,y) = (f x,f y)
+
+uncurry4 :: (a -> b -> c -> d -> e) -> (a,b,c,d) -> e
+uncurry4 f (a,b,c,d) = f a b c d
+
+lookupIO :: (Ord k, Show k) => k -> M.Map k a -> IO a
+lookupIO k = maybe err return . M.lookup k
+  where
+  err = fail $ "unbound key: " ++ show k
 

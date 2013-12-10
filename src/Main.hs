@@ -1,32 +1,44 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-import Display.Wang
-import Tile.Wang
+import Config.Render.Wang
 import Config.TileSet
 import Config.TileSet.Wang
+import Display.Wang
+import Texture
+import Tile
+import Tile.Wang
+import Util
 
-import Data.Configurator.Types
 import qualified Data.Text as T
 import System.Environment
 import System.Exit
+import Text.Show.Pretty
 
-parseArgs :: IO (Name,Int,Int)
+parseArgs :: IO (Int,Int)
 parseArgs = do
   as <- getArgs
   case as of
-    [s,r,c] -> return (T.pack s,read r, read c)
+    [c,r] -> return (read c, read r)
     _       -> usage >> exitFailure
 
 usage :: IO ()
 usage = do
   putStrLn "Usage:"
-  putStrLn $ "  ./wangtiles <tileset> <# rows> <# cols>"
+  putStrLn $ "  ./wangtiles <# cols> <# rows>"
 
 main :: IO ()
 main = do
-  tsm <- loadTileSetMap "data/tilesets.conf"
-  (set,r,c) <- parseArgs
-  (ts,cfg)  <- loadWangTileSet wangTiles2x2 =<< lookupSet set tsm
-  tm <- ioWangTileMap ts (r,c)
-  displayTileMap cfg ts tm
+  sz <- parseArgs
+  tss <- loadTileSets "data/tilesets.conf"
+  (tsc,ts) <- loadTextureFromSets tss "fence"
+  rTM <- runRandomIO $ randomTileMap (0,1) sz
+  putStrLn $ ppTileMap rTM
+  let wrc = defaultWangRenderConfig
+  let wts = mkWangTextureSet wrc tsc ts wangTiles2x2
+  displayWangTileMap wrc wts rTM
+    
+  -- (set,r,c) <- parseArgs
+  -- (ts,cfg)  <- loadWangTileSet wangTiles2x2 =<< lookupSet set tsm
+  -- tm <- ioWangTileMap ts (r,c)
+  -- displayTileMap cfg ts tm
 
