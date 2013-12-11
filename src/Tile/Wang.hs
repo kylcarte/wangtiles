@@ -116,11 +116,7 @@ satisfies cs t = S.foldl sat True cs
   sat _ (ConstrainEdge e c) = edgeColor e t == c
 
 selectTiles :: WangConstraints -> WangTileSet -> WangTileSet
-selectTiles cs ts = tsFromList suitables
-  where
-  allTiles  = tsAssocs ts
-  suitables = filter sat allTiles
-  sat (_,(_,t)) = satisfies cs t
+selectTiles cs = tsFilter $ satisfies cs . snd
 
 -- }}}
 
@@ -138,19 +134,22 @@ tileTexture = tsIndex
 
 -- TileMap {{{
 
--- Given a TileMap and a TileIndex which indicates Wang tiling,
---   generate a Wang-tiled subset of the TileMap which contains
---   only the coordinates which mapped to the given TileIndex
---   in the original TileMap.
+-- Wang-tile a subset of the TileMap that maps to a given TileIndex.
 wangSubMap :: WangTileSet -> TileIndex -> TileMap -> Random TileMap
 wangSubMap ts ti = wangTileMap ts . tmSubMap ti
 
+-- Wang-tile the contents of the TileMap.
 wangTileMap :: WangTileSet -> TileMap -> Random TileMap
-wangTileMap ts tm = tmUpdateWithKeyByM coords fn tm
+wangTileMap ts tm = tmUpdateWithKeyAtM coords fn tm
   where
   fn c _ = randomWangTile ts tm c
   coords = sortBy compareCoordsLexi $ tmCoords tm
 
+-- TODO: generalize. how do we capture which tiles have already been
+--   handled?
+-- * look at surrounding tiles, with potential respective constraints
+-- * filter out which tiles don't need to provide constraints
+-- * gather constraints and select an appropriate tile.
 randomWangTile :: WangTileSet -> TileMap -> Coord -> Random TileIndex
 randomWangTile ts tm cd = tsRandomIndex suitable
   where

@@ -74,9 +74,9 @@ choose n as = do
 groupIndices :: [(Int,Int)] -> I.IntMap [Int]
 groupIndices = foldr f I.empty
   where
-  f (x,y) = I.alter (g y) x
-  g y Nothing   = Just [y]
-  g y (Just ys) = Just $ y:ys
+  f (x,y) = I.alter (g x) y
+  g x Nothing   = Just [x]
+  g x (Just xs) = Just $ x:xs
 
 deleteGridIndices :: [(Int,Int)] -> [[a]] -> [[a]]
 deleteGridIndices is rs =
@@ -132,13 +132,22 @@ lookupIO k = maybe err return . M.lookup k
   where
   err = fail $ "unbound key: " ++ show k
 
-mapUpdateByM :: (Ord k, Monad m) => [k] -> (a -> m a)
-  -> M.Map k a -> m (M.Map k a)
-mapUpdateByM ks = mapUpdateWithKeyByM ks . const
+mapUpdateAt :: (Ord k) => [k] -> (a -> a) -> M.Map k a -> M.Map k a
+mapUpdateAt ks = mapUpdateWithKeyAt ks . const
 
-mapUpdateWithKeyByM :: (Ord k, Monad m) => [k] -> (k -> a -> m a)
+mapUpdateWithKeyAt :: (Ord k) => [k] -> (k -> a -> a)
+  -> M.Map k a -> M.Map k a
+mapUpdateWithKeyAt ks f mp = F.foldl fn mp ks
+  where
+  fn m k = M.insert k (f k $ m M.! k) m
+
+mapUpdateAtM :: (Ord k, Monad m) => [k] -> (a -> m a)
   -> M.Map k a -> m (M.Map k a)
-mapUpdateWithKeyByM ks f mp = F.foldlM fn mp ks
+mapUpdateAtM ks = mapUpdateWithKeyAtM ks . const
+
+mapUpdateWithKeyAtM :: (Ord k, Monad m) => [k] -> (k -> a -> m a)
+  -> M.Map k a -> m (M.Map k a)
+mapUpdateWithKeyAtM ks f mp = F.foldlM fn mp ks
   where
   fn m k = do
     a <- maybe err return $ M.lookup k m

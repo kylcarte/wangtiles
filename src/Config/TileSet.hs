@@ -57,6 +57,11 @@ type TileSets = M.Map T.Text TileSetConfig
 loadTileSets :: FilePath -> IO TileSets
 loadTileSets f = decodeFile f >>= traverse loadTileSetConfig
 
-lookupTileSetConfig :: T.Text -> TileSets -> IO TileSetConfig
-lookupTileSetConfig = lookupIO
+lookupTileSetConfig :: TileSets -> T.Text -> IO TileSetConfig
+lookupTileSetConfig = flip lookupIO
+
+loadTileSet :: FilePath -> T.Text -> IO TileSetConfig
+loadTileSet f n = do
+  tss <- loadTileSets f
+  lookupTileSetConfig tss n
 

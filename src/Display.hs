@@ -6,7 +6,6 @@ import Config.Render
 import Config.TileSet
 import Util
 
-import Data.Maybe (fromMaybe)
 import Graphics.Gloss hiding (Color)
 
 -- TextureSet {{{
@@ -17,18 +16,16 @@ data TextureSet a = TextureSet
   , renderTexture :: Picture -> a -> Picture
   }
 
-tileTexture :: TextureSet a -> TileIndex -> (Picture,a)
+tileTexture :: Show a => TextureSet a -> TileIndex -> (Picture,a)
 tileTexture = tsIndex . textureSet
 
 mkTextureSet :: (Picture -> a -> Picture) -> TileSetConfig
-  -> TileSet Picture -> TileSet a -> TextureSet a
-mkTextureSet rndr cfg tp ta = TextureSet
-  { textureSet  = fromMaybe err $ tsZipR tp ta
-  , textureSize = onPair toEnum $ tileSize cfg
+  -> TileSet (Picture,a) -> TextureSet a
+mkTextureSet rndr cfg ts = TextureSet
+  { textureSet    = ts
+  , textureSize   = onPair toEnum $ tileSize cfg
   , renderTexture = rndr
   }
-  where
-  err = error "TileSet index mismatch"
 
 mkTextureSet_ :: TileSetConfig -> TileSet Picture -> TextureSet ()
 mkTextureSet_ cfg tp = TextureSet
@@ -39,13 +36,13 @@ mkTextureSet_ cfg tp = TextureSet
 
 -- }}}
 
-displayTileMap :: RenderConfig -> TextureSet a -> TileMap -> IO ()
-displayTileMap cfg ts tm = display mode (windowBackground cfg)
+displayTileMap :: Show a => RenderConfig -> TextureSet a -> Size -> TileMap -> IO ()
+displayTileMap cfg ts sz tm = display mode (windowBackground cfg)
     $ scaleToWindow
     $ centerInWindow
     $ renderTileMap cfg ts tm
   where
-  (h,v) = tileMapDimensions cfg ts tm
+  (h,v) = gridDimensions cfg ts sz
   res   = screenSize cfg
   --
   availRes = toEnum res - (2 * screenBorder cfg)
@@ -56,7 +53,7 @@ displayTileMap cfg ts tm = display mode (windowBackground cfg)
   --
   mode = InWindow "gloss" (res,res) (0,0)
 
-renderTileMap :: RenderConfig -> TextureSet a -> TileMap -> Picture
+renderTileMap :: Show a => RenderConfig -> TextureSet a -> TileMap -> Picture
 renderTileMap cfg ts tm = moveToOrigin
   . pictures
   . map ( render
@@ -75,10 +72,10 @@ moveTileToCoord rc ts (c,r) = translate (toEnum c * kx) (-(toEnum r * ky))
   sp = tileSpacing rc
   (kx,ky) = onPair (+ sp) $ textureSize ts
 
-tileMapDimensions :: RenderConfig -> TextureSet a -> TileMap -> (Float,Float)
-tileMapDimensions cfg ts tm = (horiz,vert)
+gridDimensions :: RenderConfig -> TextureSet a -> Size -> (Float,Float)
+gridDimensions cfg ts sz = (horiz,vert)
   where
-  (c,r) = onPair toEnum $ tmSize tm
+  (c,r) = onPair toEnum sz
   horiz = (szX * c) + (sp * (c - 1))
   vert  = (szY * r) + (sp * (r - 1))
   (szX,szY) = textureSize ts

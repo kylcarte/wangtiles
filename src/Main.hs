@@ -1,18 +1,27 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+import Config.Render
 import Config.Render.Wang
 import Config.TileSet
+import Config.TileSet.Neighborhood
 import Config.TileSet.Wang
+import Display
+import Display.Neighborhood
 import Display.Wang
 import Texture
 import Tile
+import Tile.Neighborhood
 import Tile.Wang
 import Util
 
+import Data.List ((\\))
 import qualified Data.Text as T
 import System.Environment
 import System.Exit
 import Text.Show.Pretty
+
+-- TODO: * support layers of texture rendering
+--       * improve efficiency/memory usage for large grids
 
 parseArgs :: IO (Int,Int)
 parseArgs = do
@@ -29,16 +38,18 @@ usage = do
 main :: IO ()
 main = do
   sz <- parseArgs
-  tss <- loadTileSets "data/tilesets.conf"
-  (tsc,ts) <- loadTextureFromSets tss "fence"
   rTM <- runRandomIO $ randomTileMap (0,1) sz
-  ppTileMap rTM
-  let wrc = defaultWangRenderConfig
-  let wts = mkWangTextureSet wrc tsc ts wangTiles2x2
-  displayWangTileMap wrc wts rTM
-    
-  -- (set,c,r) <- parseArgs
-  -- (ts,cfg)  <- loadWangTileSet wangTiles2x2 =<< lookupSet set tsm
-  -- tm <- ioWangTileMap ts (c,r)
-  -- displayTileMap cfg ts tm
+  -- putStrLn $ ppTileMap rTM
+
+  tsc <- loadTileSet "data/tilesets.conf" "blob"
+  ts  <- loadNeighborhoodTileSet tsc neighborhood8
+
+  let rc = defaultRenderConfig
+  let nts = mkNeighborhoodTextureSet tsc ts
+  let tms = tmSubMap 0 rTM
+  -- putStrLn $ ppTileMap tms
+  tm <- either badCoord return $ neighborhoodTileMap ts 0 rTM
+  displayTileMap rc nts sz tm
+  where
+  badCoord c = fail $ "Couldn't find a neighborhood for " ++ show c
 

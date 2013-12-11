@@ -20,10 +20,12 @@ library
                        Tile.Wang
                        Tile.Neighborhood
                        Display
+                       Display.Neighborhood
                        Display.Wang
                        Config.Render
                        Config.Render.Wang
                        Config.TileSet
+                       Config.TileSet.Neighborhood
                        Config.TileSet.Wang
                        Texture
                        Util

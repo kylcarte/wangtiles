@@ -1,13 +1,13 @@
 
 module Tile.Neighborhood where
 
+import Tile
+import Util
+
 import Control.Applicative
-import Control.Arrow (first,second)
 import Control.Monad
 import Data.List  (transpose)
 import Data.Maybe (fromMaybe)
-import Tile
-import Util
 
 import Graphics.Gloss
 
@@ -40,16 +40,16 @@ neighborhood8 = decodeNeighborhood8s
     , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , "ooo" , "oo." , "ooo" , "ooo" , "ooo" ]
     , [ ".o." , ".oo" , "ooo" , "oo." , ".o." , ".o." , ".o." , "oo." , ".o." , ".oo" ]
     ] ---------------------------------------------------------------------------------
-  , [ [ ".o." , ".oo" , "ooo" , "oo." , ".o." , "ooo" , ".o." , "oo." , ".o." , ".oo" ]
-    , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , "o.o" , "oo." , "ooo" , "ooo" , "ooo" ]
-    , [ ".o." , ".oo" , "ooo" , "oo." , ".o." , "ooo" , ".o." , "oo." , ".o." , ".oo" ]
+  , [ [ ".o." , ".oo" , "ooo" , "oo." , ".o." , "..." , ".o." , "oo." , ".o." , ".oo" ]
+    , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , ".o." , "oo." , "ooo" , "ooo" , "ooo" ]
+    , [ ".o." , ".oo" , "ooo" , "oo." , ".o." , "..." , ".o." , "oo." , ".o." , ".oo" ]
     ] ---------------------------------------------------------------------------------
   , [ [ ".o." , ".oo" , "ooo" , "oo." , ".o." , ".o." , ".o." , "oo." , ".o." , ".oo" ]
     , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , "ooo" , "oo." , "ooo" , "ooo" , "ooo" ]
     , [ "..." , "..." , "..." , "..." , "..." , "..." , "..." , "ooo" , "ooo" , "ooo" ]
     ] ---------------------------------------------------------------------------------
-  , [   {---} [ "..." , "..." , "..." , "..." , ".oo" , "oo." , "..." , "oo." , ".oo" ]
-    ,   {---} [ ".oo" , "ooo" , "oo." , "ooo" , ".oo" , "oo." , "ooo" , "ooo" , "ooo" ]
+  , [   {---} [ "..." , "..." , "..." , "..." , "oo." , ".oo" , "..." , "oo." , ".oo" ]
+    ,   {---} [ ".oo" , "ooo" , "oo." , "ooo" , "oo." , ".oo" , "ooo" , "ooo" , "ooo" ]
     ,   {---} [ "..." , "..." , "..." , "oo." , ".o." , ".o." , ".oo" , ".o." , ".o." ]
     ] ---------------------------------------------------------------------------------
   , [   {---}   {---} [ "oo." , ".oo" , ".o." , ".oo" , "oo." , ".o." , ".o." , ".o." ]
@@ -61,9 +61,6 @@ neighborhood8 = decodeNeighborhood8s
 -- }}}
 
 -- Neighborhood {{{
-
-tmMatch :: TileMap -> Neighborhood -> Coord -> Bool
-tmMatch = gridMatch . tileMap
 
 data Neighborhood = Neighborhood
   { nNW :: Neighbor
@@ -79,18 +76,11 @@ data Neighborhood = Neighborhood
 type Neighbor = Maybe Bool
 
 instance Eq Neighborhood where
-  x == y = and
-    [ eq nNW x y
-    , eq nN  x y
-    , eq nNE x y
-    , eq nE  x y
-    , eq nSE x y
-    , eq nS  x y
-    , eq nSW x y
-    , eq nW  x y
-    ]
+  x == y = eq nNW && eq nN && eq nNE
+        && eq nW           && eq nE
+        && eq nSW && eq nS && eq nSE
     where
-    eq f a b = fromMaybe True $ (==) <$> f a <*> f b
+    eq f = fromMaybe True $ (==) <$> f x <*> f y
 
 same :: Neighbor
 same = Just True
@@ -105,37 +95,32 @@ wild = Nothing
 
 -- NeighborhoodConstraint {{{
 
-gridMatch :: Eq a => Grid a -> Neighborhood -> Coord -> Bool
-gridMatch g n c = n == gridNeighborhood g c
+tmMatches :: NeighborhoodTileSet -> TileMap -> Coord
+  -> NeighborhoodTileSet
+tmMatches ts tm c = matchingNeighborhoods ts $ tmNeighborhood tm c
 
-gridNeighborhood :: Eq a => Grid a -> Coord -> Neighborhood
-gridNeighborhood g c = Neighborhood
-  { nNW = (center ==) <$> corner cNW eN eW
-  , nN  = (center ==) <$> edge   eN
-  , nNE = (center ==) <$> corner cNE eN eE
-  , nE  = (center ==) <$> edge   eE
-  , nSE = (center ==) <$> corner cSE eS eE
-  , nS  = (center ==) <$> edge   eS
-  , nSW = (center ==) <$> corner cSW eS eW
-  , nW  = (center ==) <$> edge   eW
+matchingNeighborhoods :: NeighborhoodTileSet
+  -> Neighborhood -> NeighborhoodTileSet
+matchingNeighborhoods ts n = tsFilter ((n ==) . snd) ts
+
+tmNeighborhood :: TileMap -> Coord -> Neighborhood
+tmNeighborhood tm = mkNeighborhood . tmSurrounding tm
+
+mkNeighborhood :: Eq a => Surrounding a -> Neighborhood
+mkNeighborhood s = Neighborhood
+  { nNW = (center ==) <$> corner sNW sN sW
+  , nN  = (center ==) <$> edge   sN
+  , nNE = (center ==) <$> corner sNE sN sE
+  , nE  = (center ==) <$> edge   sE
+  , nSE = (center ==) <$> corner sSE sS sE
+  , nS  = (center ==) <$> edge   sS
+  , nSW = (center ==) <$> corner sSW sS sW
+  , nW  = (center ==) <$> edge   sW
   }
   where
-  center   = gridIndex g c
-  edge m   = m `mplus` return center
-  corner cr e1 e2 = cr `mplus` e1 `mplus` e2 `mplus` return center
-  eN  = lu . n   $ c
-  eS  = lu . s   $ c
-  eW  = lu . w   $ c
-  eE  = lu . e   $ c
-  cNW = lu . n.w $ c
-  cNE = lu . n.e $ c
-  cSE = lu . s.e $ c
-  cSW = lu . s.w $ c
-  lu = gridLookup g
-  n = second pred
-  s = second succ
-  w = first  pred
-  e = first  succ
+  center = sC s
+  edge e = e s `mplus` return center
+  corner c e1 e2 = c s `mplus` e1 s `mplus` e2 s `mplus` return center
 
 -- }}}
 
@@ -157,7 +142,7 @@ neighborhoodTexture = tsIndex
 type EncodedNeighborhoods = [[[String]]]
 
 decodeNeighborhood4s , decodeNeighborhood8s :: 
- EncodedNeighborhoods -> TileSet Neighborhood
+  EncodedNeighborhoods -> TileSet Neighborhood
 decodeNeighborhood4s = mkNeighborhoods . decodeNeighborhoods True
 decodeNeighborhood8s = mkNeighborhoods . decodeNeighborhoods False
 
@@ -191,11 +176,36 @@ decodeNeighborhoods isN4 =
   err c = error $ "cannot decode Char to Neighborhood: " ++ show c
 
 mkNeighborhoods :: [Neighborhood] -> TileSet Neighborhood
-mkNeighborhoods = tsFromList . zip [0..]
+mkNeighborhoods = tsMap relax . tsFromList . zip [0..]
+  where
+  relax n = n
+    { nNW = relaxC (nNW n) (nN n) (nW n)
+    , nNE = relaxC (nNE n) (nN n) (nE n)
+    , nSW = relaxC (nSW n) (nS n) (nW n)
+    , nSE = relaxC (nSE n) (nS n) (nE n)
+    }
+  relaxC c e1 e2
+    | e1 == diff || e2 == diff
+    = wild
+    | otherwise
+    = c
 
 -- }}}
 
--- TODO: TileMap {{{
+-- TileMap {{{
+
+-- No special traversal strategy needed
+neighborhoodTileMap :: NeighborhoodTileSet -> TileIndex
+  -> TileMap -> Either (Coord,TileIndex) TileMap
+neighborhoodTileMap ts ti tm = tmTraverseWithKey fn $ tmSubMap ti tm
+  where
+  fn c i = case tmMatch ts tm c of
+    Just i' -> return i'
+    Nothing -> Left (c,i)
+
+tmMatch :: NeighborhoodTileSet -> TileMap -> Coord
+  -> Maybe TileIndex
+tmMatch ts tm c = fmap fst $ tsGetSingle $ tmMatches ts tm c
 
 -- }}}
 

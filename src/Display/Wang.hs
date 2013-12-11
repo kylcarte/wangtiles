@@ -13,11 +13,11 @@ import Graphics.Gloss hiding (Color)
 
 type WangTextureSet = TextureSet Tile
 
-displayWangTileMap :: WangRenderConfig -> WangTextureSet -> TileMap -> IO ()
+displayWangTileMap :: WangRenderConfig -> WangTextureSet -> Size -> TileMap -> IO ()
 displayWangTileMap = displayTileMap . wRenderConfig
 
-mkWangTextureSet :: WangRenderConfig -> TileSetConfig -> TileSet Picture
-  -> TileSet Tile -> WangTextureSet
+mkWangTextureSet :: WangRenderConfig -> TileSetConfig
+  -> WangTileSet -> WangTextureSet
 mkWangTextureSet wrc tsc = mkTextureSet (renderWangTile wrc rxy) tsc
   where
   rxy = onPair toEnum $ tileSize tsc

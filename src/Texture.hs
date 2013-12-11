@@ -9,17 +9,10 @@ import Config.TileSet
 
 import Data.Maybe (catMaybes)
 import qualified Data.Map as M
-import Data.Text (Text)
 import qualified Data.Traversable as T
 import Codec.Picture
 import Graphics.Gloss
 import Graphics.Gloss.Juicy
-
-loadTextureFromSets :: TileSets -> Text -> IO (TileSetConfig,TileSet Picture)
-loadTextureFromSets tss n = do
-  tsc <- lookupTileSetConfig n tss
-  tm <- loadTextureMap tsc
-  return (tsc,tm)
 
 loadTextureMap :: TileSetConfig -> IO (TileSet Picture)
 loadTextureMap cfg = readImage (textureFile cfg) >>= splitAndRender
@@ -43,9 +36,9 @@ splitImage xy@(tileX,tileY) img
   | 0 <- imgX `mod` tileX
   , 0 <- imgY `mod` tileY
   = [ [ subImage (x,y) xy img
-      | y <- [0,tileY..(imgY - 1)]
+      | x <- [0,tileX..(imgX - 1)]
       ]
-    | x <- [0,tileX..(imgX - 1)]
+    | y <- [0,tileY..(imgY - 1)]
     ]
   | otherwise = error $
       "Texture of size " ++
