@@ -7,12 +7,14 @@ import Control.Monad
 import Control.Monad.Trans.State
 import Data.Aeson
 import qualified Data.ByteString.Lazy as BS
-import Data.List (delete)
+import Data.List (delete,intercalate)
 import qualified Data.IntMap as I
 import qualified Data.Map as M
+import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 import System.Random (RandomGen(..))
 import qualified System.Random as R
+import Text.Show.Pretty (ppShow)
 
 -- Random {{{
 
@@ -129,4 +131,24 @@ lookupIO :: (Ord k, Show k) => k -> M.Map k a -> IO a
 lookupIO k = maybe err return . M.lookup k
   where
   err = fail $ "unbound key: " ++ show k
+
+mapUpdateByM :: (Ord k, Monad m) => [k] -> (a -> m a)
+  -> M.Map k a -> m (M.Map k a)
+mapUpdateByM ks = mapUpdateWithKeyByM ks . const
+
+mapUpdateWithKeyByM :: (Ord k, Monad m) => [k] -> (k -> a -> m a)
+  -> M.Map k a -> m (M.Map k a)
+mapUpdateWithKeyByM ks f mp = F.foldlM fn mp ks
+  where
+  fn m k = do
+    a <- maybe err return $ M.lookup k m
+    b <- f k a
+    return $ M.insert k b m
+  err = fail "key not in map"
+
+disp :: Show a => a -> IO ()
+disp = putStrLn . ppShow
+
+ppRows :: [[String]] -> String
+ppRows = intercalate "\n" . map unwords
 

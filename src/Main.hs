@@ -32,13 +32,13 @@ main = do
   tss <- loadTileSets "data/tilesets.conf"
   (tsc,ts) <- loadTextureFromSets tss "fence"
   rTM <- runRandomIO $ randomTileMap (0,1) sz
-  putStrLn $ ppTileMap rTM
+  ppTileMap rTM
   let wrc = defaultWangRenderConfig
   let wts = mkWangTextureSet wrc tsc ts wangTiles2x2
   displayWangTileMap wrc wts rTM
     
-  -- (set,r,c) <- parseArgs
+  -- (set,c,r) <- parseArgs
   -- (ts,cfg)  <- loadWangTileSet wangTiles2x2 =<< lookupSet set tsm
-  -- tm <- ioWangTileMap ts (r,c)
+  -- tm <- ioWangTileMap ts (c,r)
   -- displayTileMap cfg ts tm
 

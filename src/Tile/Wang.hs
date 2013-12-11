@@ -3,11 +3,10 @@
 
 module Tile.Wang where
 
-import Control.Monad
+import Control.Arrow (first,second)
+import Data.List (sortBy)
 import qualified Data.Set as S
 import qualified Data.Map as M
-import qualified System.Random as R
-import System.Random (RandomGen(..))
 
 import Graphics.Gloss.Data.Picture
 import qualified Graphics.Gloss.Data.Color as Gloss
@@ -80,8 +79,8 @@ mkTiles = tsFromList . zip [0..] . map (uncurry4 mkTile)
 tileColors :: Tile -> [(Edge,Color)]
 tileColors = M.assocs . tColors
 
-edgeColor :: Tile -> Edge -> Color
-edgeColor t e = tColors t M.! e
+edgeColor :: Edge -> Tile -> Color
+edgeColor e t = tColors t M.! e
 
 edgeAxis :: a -> a -> Edge -> a
 edgeAxis ns we e = case e of
@@ -99,24 +98,24 @@ glossColor c = case c of
 
 -- }}}
 
--- Constraint {{{
+-- WangConstraint {{{
 
-data Constraint
+data WangConstraint
   = ConstrainEdge Edge Color
   deriving (Eq,Ord,Show)
 
-type Constraints = S.Set Constraint
+type WangConstraints = S.Set WangConstraint
 
-colorConstraints :: [(Edge,Color)] -> Constraints
+colorConstraints :: [(Edge,Color)] -> WangConstraints
 colorConstraints = S.fromList . map (uncurry ConstrainEdge)
 
-satisfies :: Constraints -> Tile -> Bool
+satisfies :: WangConstraints -> Tile -> Bool
 satisfies cs t = S.foldl sat True cs
   where
   sat False _ = False
-  sat _ (ConstrainEdge e c) = edgeColor t e == c
+  sat _ (ConstrainEdge e c) = edgeColor e t == c
 
-selectTiles :: Constraints -> WangTileSet -> WangTileSet
+selectTiles :: WangConstraints -> WangTileSet -> WangTileSet
 selectTiles cs ts = tsFromList suitables
   where
   allTiles  = tsAssocs ts
@@ -129,57 +128,58 @@ selectTiles cs ts = tsFromList suitables
 
 type WangTileSet = TileSet (Picture,Tile)
 
-textureIn :: WangTileSet -> TileIndex -> Picture
-textureIn ts i = fst $ tileTexture ts i
-
-tileIn :: WangTileSet -> TileIndex -> Tile
-tileIn ts i = snd $ tileTexture ts i
+wangTileAt :: WangTileSet -> TileIndex -> Tile
+wangTileAt ts i = snd $ tileTexture ts i
 
 tileTexture :: WangTileSet -> TileIndex -> (Picture,Tile)
-tileTexture ts i = tsIndex ts i
-
-randomTileIndex :: WangTileSet -> Random TileIndex
-randomTileIndex = tsRandomKey
+tileTexture = tsIndex
 
 -- }}}
 
 -- TileMap {{{
 
-edgeColorAt :: WangTileSet -> Coord -> Edge -> TileMap -> Color
-edgeColorAt ts c e tm = edgeColor t e
-  where
-  ti = tmIndex tm c
-  t  = tileIn ts ti
+-- Given a TileMap and a TileIndex which indicates Wang tiling,
+--   generate a Wang-tiled subset of the TileMap which contains
+--   only the coordinates which mapped to the given TileIndex
+--   in the original TileMap.
+wangSubMap :: WangTileSet -> TileIndex -> TileMap -> Random TileMap
+wangSubMap ts ti = wangTileMap ts . tmSubMap ti
 
-updateTile :: WangTileSet -> TileMap -> Coord -> Random TileMap
-updateTile ts tm c@(row,col) = do
-  i <- randomTileIndex suitable
-  return $ tmUpdate1 c i tm
+wangTileMap :: WangTileSet -> TileMap -> Random TileMap
+wangTileMap ts tm = tmUpdateWithKeyByM coords fn tm
   where
-  leftOf = (row,col-1)
-  above  = (row-1,col)
+  fn c _ = randomWangTile ts tm c
+  coords = sortBy compareCoordsLexi $ tmCoords tm
+
+randomWangTile :: WangTileSet -> TileMap -> Coord -> Random TileIndex
+randomWangTile ts tm cd = tsRandomIndex suitable
+  where
+  left = first  pred cd
+  up   = second pred cd
   suitable = selectTiles cs ts
-  cs = colorConstraints csl
-  csl = concat
-         [ if row == 0 then [] else [ ( North , edgeColorAt ts above  South tm ) ]
-         , if col == 0 then [] else [ ( West  , edgeColorAt ts leftOf East  tm ) ]
+  cs = colorConstraints $ concat
+         [ if col cd == 0 then [] else [ ( West  , edgeColorAt left East  ) ]
+         , if row cd == 0 then [] else [ ( North , edgeColorAt up   South ) ]
          ]
+  edgeColorAt :: Coord -> Edge -> Color
+  edgeColorAt c e = edgeColor e . wangTileAt ts . flip tmIndex c $ tm
 
-ioWangTileMap :: WangTileSet -> Size -> IO TileMap
-ioWangTileMap ts sz = do
-  g <- R.getStdGen
-  let (tm,g') = mkWangTileMap ts sz g
-  R.setStdGen g'
-  return tm
+-- }}}
 
-mkWangTileMap :: RandomGen g => WangTileSet -> Size -> g -> (TileMap,g)
-mkWangTileMap ts sz g = runRandom g $ randomWangTileMap ts sz
+-- Pretty Printing {{{
 
-randomWangTileMap :: WangTileSet -> Size -> Random TileMap
-randomWangTileMap ts sz@(rs,cs) = foldM (updateTile ts) initialTm coords
+ppWT :: Tile -> String
+ppWT t = ppRows
+  [ [ " "     , eg North , " "     ]
+  , [ eg West , " "      , eg East ]
+  , [ " "     , eg South , " "     ]
+  ]
   where
-  coords = [ (r,c) | r <- [0..rs], c <- [0..cs] ]
-  initialTm = mkEmptyTileMap sz
+  eg e = case edgeColor e t of
+    Red    -> "R"
+    Green  -> "G"
+    Yellow -> "Y"
+    Blue   -> "B"
 
 -- }}}
 
