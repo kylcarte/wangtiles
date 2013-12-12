@@ -44,12 +44,18 @@ main = do
 
   blob  <- loadNeighborhoodTextureSet tss "blob"  neighborhood8
   fence <- loadNeighborhoodTextureSet tss "fence" neighborhood4
-  rtm <- runRandomIO $ randomTileMap (0,1) sz
-
+  rtm <- io' $ randomTileMap (0,1) sz
   tm1 <- neighborhoodIO $ neighborhoodTileMapByIndex blob  0 rtm
   tm2 <- neighborhoodIO $ neighborhoodTileMapByIndex fence 1 rtm
-  displayLayers rc (tmSize rtm) (textureSize blob)
-    $ map (uncurry $ renderTileMap rc) [(blob,tm1),(fence,tm2)]
+
+  grass <- loadWangTextureSet wrc tss "grass" wangTiles2x2
+  let tm = mkEmptyTileMap sz
+  tm3 <- wangIO $ wangTileMap grass tm
+
+  displayTileMap rc grass tm3
+  -- displayLayers rc (tmSize rtm) (textureSize blob)
+  --   $ map (uncurry $ renderTileMap rc) [(blob,tm1),(fence,tm2)]
   where
   rc = defaultRenderConfig { windowBackground = black }
+  wrc = defaultWangRenderConfig { wRenderConfig = rc }
 

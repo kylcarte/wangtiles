@@ -270,11 +270,6 @@ tmFromList = tmFromGrid . gridFromList
 tmFilter :: (TileIndex -> Bool) -> TileMap -> TileMap
 tmFilter = tmOnGrid . gridFilter
 
-{-
-tmSize :: TileMap -> Size
-tmSize = gridSize . tileMap
--}
-
 tmRows :: TileMap -> Int
 tmRows = gridRows . tileMap
 
@@ -325,6 +320,10 @@ tmUpdateWithKeyAtM cs = tmOnGridM . gridUpdateWithKeyAtM cs
 tmTraverse :: (Applicative f) => (TileIndex -> f TileIndex)
   -> TileMap -> f TileMap
 tmTraverse = tmOnGridM . T.traverse
+
+tmTraverseKeys :: (Applicative f) => (Coord -> f TileIndex)
+  -> TileMap -> f TileMap
+tmTraverseKeys = tmOnGridM . gridTraverseKeys
 
 randomTileMap :: (TileIndex,TileIndex) -> Size -> Random TileMap
 randomTileMap rng sz = fmap (TileMap sz) . randomGrid rng $ sz

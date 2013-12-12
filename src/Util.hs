@@ -243,9 +243,14 @@ fProjY  f = FSize { fWidth =         0 , fHeight = fHeight f }
 
 class (Functor m) => HandleIO m where
   io :: String -> m a -> IO a
+  io' :: m a -> IO a
+  io' = io "HandleIO failure"
 
 instance HandleIO Random where
   io _ = runRandomIO
+
+wangIO :: Random a -> IO a
+wangIO = io "failure in Random"
 
 instance (Show e) => HandleIO (Either e) where
   io msg m = case m of

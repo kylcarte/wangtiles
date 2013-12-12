@@ -11,22 +11,20 @@ import Util
 
 import Graphics.Gloss hiding (Color)
 
-type WangTextureSet = TextureSet Tile
-
 displayWangTileMap :: WangRenderConfig -> WangTextureSet -> TileMap -> IO ()
 displayWangTileMap = displayTileMap . wRenderConfig
 
 mkWangTextureSet :: WangRenderConfig -> TileSetConfig
   -> WangTileSet -> WangTextureSet
-mkWangTextureSet wrc tsc = mkTextureSet (renderWangTile wrc rsz) tsc
+mkWangTextureSet cfg tsc = mkTextureSet (renderWangTile cfg rsz) tsc
   where
   rsz = cast $ tileSize tsc
 
 renderWangTile :: WangRenderConfig -> FSize
   -> Picture -> Tile -> Picture
 renderWangTile cfg rsz p t = pictures
-  [ if tileRenderTexture cfg' then p  else blank
-  , if wRenderEdges      cfg  then es else blank
+  [ if wRenderEdges      cfg  then es else blank
+  , if tileRenderTexture cfg' then p  else blank
   ]
   where
   cfg' = wRenderConfig cfg

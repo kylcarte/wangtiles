@@ -3,13 +3,14 @@
 
 module Tile.Wang where
 
-import qualified Data.Set as S
-import qualified Data.Map as M
-
-import Graphics.Gloss.Data.Picture
-import qualified Graphics.Gloss.Data.Color as Gloss
+import Display
 import Tile
 import Util
+
+import qualified Data.Set as S
+import qualified Data.Map as M
+import Graphics.Gloss.Data.Picture
+import qualified Graphics.Gloss.Data.Color as Gloss
 
 -- Tiles {{{
 
@@ -123,21 +124,26 @@ selectTiles cs = tsFilter $ satisfies cs . snd
 type WangTileSet = TileSet (Picture,Tile)
 
 wangTileAt :: WangTileSet -> TileIndex -> Tile
-wangTileAt ts i = snd $ tileTexture ts i
+wangTileAt ts i = snd $ wangTexture ts i
 
-tileTexture :: WangTileSet -> TileIndex -> (Picture,Tile)
-tileTexture = tsIndex
+wangTexture :: WangTileSet -> TileIndex -> (Picture,Tile)
+wangTexture = tsIndex
 
 -- }}}
 
 -- TileMap {{{
 
-wangTileMapByIndex :: WangTileSet -> TileIndex -> TileMap -> Random TileMap
-wangTileMapByIndex ts ti tm = wangTileMap ts tm $ tmSubMapByValue ti tm
+type WangTextureSet = TextureSet Tile
+
+wangTileMapByIndex :: WangTextureSet -> TileIndex -> TileMap -> Random TileMap
+wangTileMapByIndex ts ti tm = wangTileMapAt ts tm $ tmSubMapByValue ti tm
 
 -- Wang-tile the contents of the TileMap.
-wangTileMap :: WangTileSet -> TileMap -> Coords -> Random TileMap
-wangTileMap ts = csGenerateTileMapA . randomWangTile ts
+wangTileMapAt :: WangTextureSet -> TileMap -> Coords -> Random TileMap
+wangTileMapAt ts = csGenerateTileMapA . randomWangTile (textureSet ts)
+
+wangTileMap :: WangTextureSet -> TileMap -> Random TileMap
+wangTileMap ts tm = tmTraverseKeys (randomWangTile (textureSet ts) tm) tm
 
 -- TODO: generalize. how do we capture which tiles have already been
 --   handled?
