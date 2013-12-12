@@ -20,14 +20,16 @@ import System.Environment
 import System.Exit
 import Text.Show.Pretty
 
+import Graphics.Gloss
+
 -- TODO: * support layers of texture rendering
 --       * improve efficiency/memory usage for large grids
 
-parseArgs :: IO (Int,Int)
+parseArgs :: IO Size
 parseArgs = do
   as <- getArgs
   case as of
-    [c,r] -> return (read c, read r)
+    [c,r] -> return $ fromWidthHeight (read c,read r)
     _       -> usage >> exitFailure
 
 usage :: IO ()
@@ -38,18 +40,16 @@ usage = do
 main :: IO ()
 main = do
   sz <- parseArgs
-  rTM <- runRandomIO $ randomTileMap (0,1) sz
-  -- putStrLn $ ppTileMap rTM
+  tss <- loadTileSets "data/tilesets.conf"
 
-  tsc <- loadTileSet "data/tilesets.conf" "blob"
-  ts  <- loadNeighborhoodTileSet tsc neighborhood8
+  blob  <- loadNeighborhoodTextureSet tss "blob"  neighborhood8
+  fence <- loadNeighborhoodTextureSet tss "fence" neighborhood4
+  rtm <- runRandomIO $ randomTileMap (0,1) sz
 
-  let rc = defaultRenderConfig
-  let nts = mkNeighborhoodTextureSet tsc ts
-  let tms = tmSubMap 0 rTM
-  -- putStrLn $ ppTileMap tms
-  tm <- either badCoord return $ neighborhoodTileMap ts 0 rTM
-  displayTileMap rc nts sz tm
+  tm1 <- neighborhoodIO $ neighborhoodTileMapByIndex blob  0 rtm
+  tm2 <- neighborhoodIO $ neighborhoodTileMapByIndex fence 1 rtm
+  displayLayers rc (tmSize rtm) (textureSize blob)
+    $ map (uncurry $ renderTileMap rc) [(blob,tm1),(fence,tm2)]
   where
-  badCoord c = fail $ "Couldn't find a neighborhood for " ++ show c
+  rc = defaultRenderConfig { windowBackground = black }
 

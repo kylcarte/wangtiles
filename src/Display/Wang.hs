@@ -1,46 +1,47 @@
 
 module Display.Wang where
 
-import Tile
-import Tile.Wang
 import Config.Render
 import Config.Render.Wang
 import Config.TileSet
 import Display
+import Tile
+import Tile.Wang
 import Util
 
 import Graphics.Gloss hiding (Color)
 
 type WangTextureSet = TextureSet Tile
 
-displayWangTileMap :: WangRenderConfig -> WangTextureSet -> Size -> TileMap -> IO ()
+displayWangTileMap :: WangRenderConfig -> WangTextureSet -> TileMap -> IO ()
 displayWangTileMap = displayTileMap . wRenderConfig
 
 mkWangTextureSet :: WangRenderConfig -> TileSetConfig
   -> WangTileSet -> WangTextureSet
-mkWangTextureSet wrc tsc = mkTextureSet (renderWangTile wrc rxy) tsc
+mkWangTextureSet wrc tsc = mkTextureSet (renderWangTile wrc rsz) tsc
   where
-  rxy = onPair toEnum $ tileSize tsc
+  rsz = cast $ tileSize tsc
 
-renderWangTile :: WangRenderConfig -> (Float,Float)
+renderWangTile :: WangRenderConfig -> FSize
   -> Picture -> Tile -> Picture
-renderWangTile cfg rxy p t = pictures
+renderWangTile cfg rsz p t = pictures
   [ if tileRenderTexture cfg' then p  else blank
   , if wRenderEdges      cfg  then es else blank
   ]
   where
   cfg' = wRenderConfig cfg
-  es = pictures $ map (renderEdge cfg rxy) $ tileColors t
+  es = pictures $ map (renderEdge cfg rsz) $ tileColors t
 
-renderEdge :: WangRenderConfig -> (Float,Float)
+renderEdge :: WangRenderConfig -> FSize
   -> (Edge,Color) -> Picture
-renderEdge cfg (radX,radY) (e,c) = moveToEdge $ colorEdge shape
+renderEdge cfg rsz (e,c) = moveToEdge $ colorEdge shape
   where
-  shape = arcSolid 0 180 $ wEdgeRadius cfg $ edgeAxis radX radY e
+  shape = arcSolid 0 180
+    $ wEdgeRadius cfg
+    $ fToFSize edgeAxis rsz e
   colorEdge = color $ glossColor c
   moveToEdge = case e of
-    North -> translate 0 radY    . rotate 180
-    South -> translate 0 (-radY)
-    West  -> translate (-radX) 0 . rotate 90
-    East  -> translate radX    0 . rotate (-90)
-
+    North -> move (         fProjY rsz) . rotate 180
+    South -> move (fReflX $ fProjY rsz)
+    West  -> move (fReflY $ fProjX rsz) . rotate   90
+    East  -> move (         fProjX rsz) . rotate (-90)

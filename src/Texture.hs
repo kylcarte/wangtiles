@@ -7,6 +7,7 @@ import Tile
 import Util
 import Config.TileSet
 
+import Control.Arrow ((&&&))
 import Data.Maybe (catMaybes)
 import qualified Data.Map as M
 import qualified Data.Traversable as T
@@ -26,16 +27,16 @@ loadTextureMap cfg = readImage (textureFile cfg) >>= splitAndRender
   flattenAndIndex :: [[Maybe a]] -> [(Int,a)]
   flattenAndIndex = zip [0..] . catMaybes . concat
 
-mkTextureMap :: M.Map (Int,Int) Picture
-  -> TileSet (Int,Int)
+mkTextureMap :: M.Map Coord Picture
+  -> TileSet Coord
   -> Maybe (TileSet Picture)
 mkTextureMap = T.traverse . flip M.lookup
 
-splitImage :: (Int,Int) -> DynamicImage -> [[DynamicImage]]
-splitImage xy@(tileX,tileY) img
+splitImage :: Size -> DynamicImage -> [[DynamicImage]]
+splitImage ts img
   | 0 <- imgX `mod` tileX
   , 0 <- imgY `mod` tileY
-  = [ [ subImage (x,y) xy img
+  = [ [ subImage (Coord { col = x , row = y }) ts img
       | x <- [0,tileX..(imgX - 1)]
       ]
     | y <- [0,tileY..(imgY - 1)]
@@ -46,16 +47,21 @@ splitImage xy@(tileX,tileY) img
       " does not fit tiles of size " ++
       show tileX ++ "x" ++ show tileY
   where
-  imgX = dynImgWidth  img
-  imgY = dynImgHeight img
+  (tileX,tileY) = widthHeight ts
+  (imgX,imgY) = diWidthHeight img
 
-subImage :: (Int,Int) -> (Int,Int) -> DynamicImage -> DynamicImage
-subImage (loX,loY) (w,h) = mapDynamicImage mkSubImage
-  where
-  mkSubImage i = generateImage (readSubImage i) w h
-  readSubImage img x y = pixelAt img (loX + x) (loY + y)
+subImage :: Coord -> Size -> DynamicImage -> DynamicImage
+subImage cd sz = mapDynamicImage $ mkSubImage cd sz
 
+mkSubImage :: Pixel a => Coord -> Size -> Image a -> Image a
+mkSubImage cd sz i = flip fToSize sz
+  $ generateImage
+  $ pixelFromCoord i cd
 
+pixelFromCoord :: Pixel a => Image a -> Coord -> Int -> Int -> a
+pixelFromCoord i cd = fFromCoord $ fToCoord (pixelAt i) . (cd +)
+
+-- DynamicImage {{{
 
 -- ugh
 onDynamicImage :: (forall a. Pixel a => Image a -> b)
@@ -92,9 +98,8 @@ mapDynamicImage f img = case img of
   ImageCMYK8  i -> ImageCMYK8  $ f i
   ImageCMYK16 i -> ImageCMYK16 $ f i
 
-dynImgWidth :: DynamicImage -> Int
-dynImgWidth = onDynamicImage imageWidth
+diWidthHeight :: DynamicImage -> (Int,Int)
+diWidthHeight = onDynamicImage imageWidth &&& onDynamicImage imageHeight
 
-dynImgHeight :: DynamicImage -> Int
-dynImgHeight = onDynamicImage imageHeight
+-- }}}
 

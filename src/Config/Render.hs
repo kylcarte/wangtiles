@@ -48,10 +48,7 @@ hexDigitToInt c =
     'e' -> 14
     'f' -> 15
     _ | isDigit c -> digitToInt c
-    _ -> error $ "Not a hex digit: " ++ [c]
-
-addHexDigits :: (Char,Char) -> Int
-addHexDigits (a,b) = hexDigitToInt a * 16 + hexDigitToInt b
+    _ -> error $ "Not a hex digit: " ++ show c
 
 getColor :: Object -> T.Text -> Parser Color
 getColor o f = do
@@ -75,9 +72,11 @@ getColor o f = do
       | all isHexDigit cs
       -> return $ makeColor r g b a
          where
-         r = toEnum $ addHexDigits (r1,r2)
-         g = toEnum $ addHexDigits (g1,g2)
-         b = toEnum $ addHexDigits (b1,b2)
-         a = toEnum $ addHexDigits (a1,a2)
+         r = addHexDigits r1 r2
+         g = addHexDigits g1 g2
+         b = addHexDigits b1 b2
+         a = addHexDigits a1 a2
     _ -> mzero
+  where
+  addHexDigits a b = toEnum $ hexDigitToInt a * 16 + hexDigitToInt b
 

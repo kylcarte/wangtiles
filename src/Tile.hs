@@ -8,8 +8,6 @@ module Tile where
 import Util
 
 import Control.Applicative
-import Control.Arrow (first,second)
-import Control.Monad
 import Data.Maybe (fromMaybe)
 import qualified Data.IntMap as I
 import qualified Data.Map as M
@@ -17,25 +15,28 @@ import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 import qualified System.Random as R
 
-import Text.Show.Pretty
+-- Coords {{{
 
-type Coord = (Int,Int)
+newtype Coords = Coords
+  { coords :: Grid ()
+  } deriving (Eq,Show)
 
-col,row :: Coord -> Int
-col = fst
-row = snd
+csMap :: (Coord -> a) -> Coords -> Grid a
+csMap f = gridOnMap (M.mapWithKey (const . f)) . coords
 
--- compare Coords lexicographically, row over column
-compareCoordsLexi :: Coord -> Coord -> Ordering
-compareCoordsLexi (c1,r1) (c2,r2) = case r of
-  EQ -> compare c1 c2
-  _  -> r
-  where
-  r = compare r1 r2
+csTraverse :: (Applicative m) => (Coord -> m a) -> Coords -> m (Grid a)
+csTraverse f = gridTraverseKeys f . coords
 
-type Size  = (Int,Int)
+csGenerateTileMap :: (Coord -> TileIndex) -> Coords -> TileMap
+csGenerateTileMap f = tmFromGrid . csMap f
 
-type TileIndex = Int
+csGenerateTileMapA :: (Applicative m) => (Coord -> m TileIndex) -> Coords -> m TileMap
+csGenerateTileMapA f = fmap tmFromGrid . csTraverse f
+
+coordIsIn :: Coords -> Coord -> Bool
+coordIsIn cs c = gridMember c $ coords cs
+
+-- }}}
 
 -- TileSet {{{
 
@@ -52,10 +53,10 @@ tsFromList = TileSet . I.fromList
 tsAssocs :: TileSet a -> [(TileIndex,a)]
 tsAssocs = I.assocs . tileSet
 
-tsIndex :: Show a => TileSet a -> TileIndex -> a
+tsIndex :: TileSet a -> TileIndex -> a
 tsIndex ts i = case I.lookup i $ tileSet ts of
   Just a -> a
-  Nothing -> error $ "key " ++ show i ++ " is not in TileSet: " ++ ppShow ts
+  Nothing -> error $ "key " ++ show i ++ " is not in TileSet"
 
 tsGetSingle :: TileSet a -> Maybe (TileIndex,a)
 tsGetSingle ts
@@ -103,36 +104,47 @@ newtype Grid a = Grid
   } deriving (Eq,Show,Functor,F.Foldable,T.Traversable)
 
 mkEmptyGrid :: Size -> a -> Grid a
-mkEmptyGrid (c,r) a = Grid $ M.fromList
-  [ ((x,y),a)
-  | x <- [0..c-1]
-  , y <- [0..r-1]
+mkEmptyGrid sz a = Grid $ M.fromList
+  [ (Coord { row = r , col = c },a)
+  | c <- [0..width  sz - 1]
+  , r <- [0..height sz - 1]
   ]
 
-gridSubMap :: Eq a => a -> Grid a -> Grid a
-gridSubMap a = Grid . M.filter (== a) . fromGrid
+gridSubMap :: Coords -> Grid a -> Grid a
+gridSubMap cs = gridOnMap $ M.filterWithKey fn
+  where
+  fn c _ = coordIsIn cs c
+
+gridSubMapByValue :: Eq a => a -> Grid a -> Grid a
+gridSubMapByValue = gridOnMap . M.filter . (==)
 
 gridFromList :: [(Coord,a)] -> Grid a
 gridFromList = Grid . M.fromList
 
 gridSize :: Grid a -> Size
-gridSize =
-    onPair (succ . maximum)
-  . unzip
-  . M.keys
-  . fromGrid
+gridSize = mkSize . getMaxs
+  where
+  mkSize (mr,mc) = Size { width = mc , height = mr }
+  getMaxs = 
+      onPair (succ . maximum)
+    . colsRows
+    . M.keys
+    . fromGrid
 
-rows :: Grid a -> Int
-rows = snd . gridSize
+gridRows :: Grid a -> Int
+gridRows = height . gridSize
 
-cols :: Grid a -> Int
-cols = fst . gridSize
+gridCols :: Grid a -> Int
+gridCols = width . gridSize
 
 gridCoords :: Grid a -> [Coord]
 gridCoords = M.keys . fromGrid
 
 gridFilter :: (a -> Bool) -> Grid a -> Grid a
-gridFilter f = Grid . M.filter f . fromGrid
+gridFilter = gridOnMap . M.filter
+
+gridMember :: Coord -> Grid a -> Bool
+gridMember c = M.member c . fromGrid
 
 gridIndex :: Grid a -> Coord -> a
 gridIndex g c = fromGrid g M.! c
@@ -143,31 +155,36 @@ gridLookup g c = M.lookup c (fromGrid g)
 gridContents :: Grid a -> [(Coord,a)]
 gridContents = M.assocs . fromGrid
 
+gridOnMap :: (M.Map Coord a -> M.Map Coord b) -> Grid a -> Grid b
+gridOnMap f = Grid . f . fromGrid
+
+gridOnMapM :: (Functor m) => (M.Map Coord a -> m (M.Map Coord b)) -> Grid a -> m (Grid b)
+gridOnMapM f = fmap Grid . f . fromGrid
+
 gridUpdateWithKey :: (Coord -> a -> a) -> Grid a -> Grid a
-gridUpdateWithKey f = Grid . M.mapWithKey f . fromGrid
+gridUpdateWithKey = gridOnMap . M.mapWithKey
 
 gridUpdateAt :: [Coord] -> (a -> a) -> Grid a -> Grid a
-gridUpdateAt cs f = Grid . mapUpdateAt cs f . fromGrid
+gridUpdateAt cs = gridOnMap . mapUpdateAt cs
 
 gridUpdateWithKeyAt :: [Coord] -> (Coord -> a -> a)
   -> Grid a -> Grid a
-gridUpdateWithKeyAt cs f = Grid . mapUpdateWithKeyAt cs f . fromGrid
+gridUpdateWithKeyAt cs = gridOnMap . mapUpdateWithKeyAt cs
 
-gridUpdateAtM :: (Monad m) => [Coord]
+gridUpdateAtM :: (Functor m, Monad m) => [Coord]
   -> (a -> m a) -> Grid a -> m (Grid a)
-gridUpdateAtM cs f g = do
-  let m = fromGrid g
-  m' <- mapUpdateAtM cs f m
-  return $ Grid m'
+gridUpdateAtM cs = gridOnMapM . mapUpdateAtM cs
 
-gridUpdateWithKeyAtM :: (Monad m) => [Coord]
+gridUpdateWithKeyAtM :: (Functor m, Monad m) => [Coord]
   -> (Coord -> a -> m a) -> Grid a -> m (Grid a)
-gridUpdateWithKeyAtM cs f =
-  (return . Grid <=< mapUpdateWithKeyAtM cs f) . fromGrid
+gridUpdateWithKeyAtM cs = gridOnMapM . mapUpdateWithKeyAtM cs
 
-gridTraverseWithKey :: (Applicative m) => (Coord -> a -> m a)
+gridTraverseWithKey :: (Functor m, Applicative m) => (Coord -> a -> m a)
   -> Grid a -> m (Grid a)
-gridTraverseWithKey f = fmap Grid . M.traverseWithKey f . fromGrid
+gridTraverseWithKey = gridOnMapM . M.traverseWithKey
+
+gridTraverseKeys :: (Functor m, Applicative m) => (Coord -> m a) -> Grid b -> m (Grid a)
+gridTraverseKeys f = gridOnMapM $ M.traverseWithKey (const . f)
 
 randomGrid :: forall a. R.Random a => (a,a) -> Size -> Random (Grid a)
 randomGrid rng sz = T.traverse f . mkEmptyGrid sz =<< random
@@ -178,14 +195,14 @@ randomGrid rng sz = T.traverse f . mkEmptyGrid sz =<< random
 ppGrid :: Show a => Grid a -> String
 ppGrid g = ppRows
   [ [ pad s
-    | x <- [0..c-1]
-    , let s = fromMaybe " " $ fmap show $ gridLookup g (x,y)
+    | c <- [0..width sz - 1]
+    , let s = fromMaybe " " $ fmap show $ gridLookup g Coord { row = r , col = c }
     ]
-  | y <- [0..r-1]
+  | r <- [0..height sz - 1]
   ]
   where
-  (c,r) = gridSize g
-  rdigits = fromEnum (logBase 10 $ toEnum r :: Float)
+  sz = gridSize g
+  rdigits = logBase 10 `withFloat` width sz
   pad s = replicate (rdigits - length s) ' ' ++ s
 
 -- }}}
@@ -218,10 +235,10 @@ gridSurrounding g c = Surrounding
   }
   where
   lu = gridLookup g
-  n = second pred
-  s = second succ
-  w = first  pred
-  e = first  succ
+  n = onVertical   pred
+  s = onVertical   succ
+  w = onHorizontal pred
+  e = onHorizontal succ
 
 tmSurrounding :: TileMap -> Coord -> Surrounding TileIndex
 tmSurrounding = gridSurrounding . tileMap
@@ -230,30 +247,39 @@ tmSurrounding = gridSurrounding . tileMap
 
 -- TileMap {{{
 
-newtype TileMap = TileMap
-  { tileMap :: Grid TileIndex
+data TileMap = TileMap
+  { tmSize  :: Size
+  , tileMap :: Grid TileIndex
   } deriving (Eq,Show)
 
-mkEmptyTileMap :: Size -> TileMap
-mkEmptyTileMap sz = TileMap { tileMap = mkEmptyGrid sz 0 }
+tmFromGrid :: Grid TileIndex -> TileMap
+tmFromGrid g = TileMap { tmSize  = gridSize g , tileMap = g }
 
-tmSubMap :: TileIndex -> TileMap -> TileMap
-tmSubMap ti = TileMap . gridSubMap ti . tileMap
+mkEmptyTileMap :: Size -> TileMap
+mkEmptyTileMap sz = tmFromGrid $ mkEmptyGrid sz 0
+
+tmSubMap :: Coords -> TileMap -> TileMap
+tmSubMap = tmOnGrid . gridSubMap
+
+tmSubMapByValue :: TileIndex -> TileMap -> Coords
+tmSubMapByValue ti = Coords . (() <$) . gridSubMapByValue ti . tileMap
 
 tmFromList :: [(Coord,TileIndex)] -> TileMap
-tmFromList = TileMap . gridFromList
+tmFromList = tmFromGrid . gridFromList
 
 tmFilter :: (TileIndex -> Bool) -> TileMap -> TileMap
-tmFilter f = TileMap . gridFilter f . tileMap
+tmFilter = tmOnGrid . gridFilter
 
+{-
 tmSize :: TileMap -> Size
 tmSize = gridSize . tileMap
+-}
 
 tmRows :: TileMap -> Int
-tmRows = rows . tileMap
+tmRows = gridRows . tileMap
 
 tmCols :: TileMap -> Int
-tmCols = cols . tileMap
+tmCols = gridCols . tileMap
 
 tmCoords :: TileMap -> [Coord]
 tmCoords = gridCoords . tileMap
@@ -264,39 +290,44 @@ tmAssocs = gridContents . tileMap
 tmIndex :: TileMap -> Coord -> TileIndex
 tmIndex tm c = gridIndex (tileMap tm) c
 
+tmOnGrid :: (Grid TileIndex -> Grid TileIndex) -> TileMap -> TileMap
+tmOnGrid f tm = TileMap (tmSize tm) . f . tileMap $ tm
+
+tmOnGridM :: (Functor m) => (Grid TileIndex -> m (Grid TileIndex)) -> TileMap -> m TileMap
+tmOnGridM f tm = fmap (TileMap $ tmSize tm) . f . tileMap $ tm
+
 tmUpdate :: (TileIndex -> TileIndex) -> TileMap -> TileMap
-tmUpdate f = TileMap . fmap f . tileMap
+tmUpdate = tmOnGrid . fmap
 
 tmUpdateWithKey :: (Coord -> TileIndex -> TileIndex)
   -> TileMap -> TileMap
-tmUpdateWithKey f = TileMap . gridUpdateWithKey f . tileMap
+tmUpdateWithKey = tmOnGrid . gridUpdateWithKey
 
 tmUpdateAt :: [Coord] -> (TileIndex -> TileIndex) -> TileMap -> TileMap
-tmUpdateAt cs f = TileMap . gridUpdateAt cs f . tileMap
+tmUpdateAt cs = tmOnGrid . gridUpdateAt cs
 
 tmUpdateWithKeyAt :: [Coord] -> (Coord -> TileIndex -> TileIndex)
   -> TileMap -> TileMap
-tmUpdateWithKeyAt cs f = TileMap . gridUpdateWithKeyAt cs f . tileMap
+tmUpdateWithKeyAt cs = tmOnGrid . gridUpdateWithKeyAt cs
 
-tmUpdateAtM :: (Monad m) => [Coord]
+tmUpdateAtM :: (Functor m, Monad m) => [Coord]
   -> (TileIndex -> m TileIndex) -> TileMap -> m TileMap
-tmUpdateAtM cs f = (return . TileMap <=< gridUpdateAtM cs f) . tileMap
+tmUpdateAtM cs = tmOnGridM . gridUpdateAtM cs
 
 tmTraverseWithKey :: (Applicative m) => (Coord -> TileIndex -> m TileIndex)
   -> TileMap -> m TileMap
-tmTraverseWithKey f = fmap TileMap . gridTraverseWithKey f . tileMap
+tmTraverseWithKey = tmOnGridM . gridTraverseWithKey
 
-tmUpdateWithKeyAtM :: (Monad m) => [Coord]
+tmUpdateWithKeyAtM :: (Functor m, Monad m) => [Coord]
   -> (Coord -> TileIndex -> m TileIndex) -> TileMap -> m TileMap
-tmUpdateWithKeyAtM cs f =
-  (return . TileMap <=< gridUpdateWithKeyAtM cs f) . tileMap
+tmUpdateWithKeyAtM cs = tmOnGridM . gridUpdateWithKeyAtM cs
 
 tmTraverse :: (Applicative f) => (TileIndex -> f TileIndex)
   -> TileMap -> f TileMap
-tmTraverse f = fmap TileMap . T.traverse f . tileMap
+tmTraverse = tmOnGridM . T.traverse
 
 randomTileMap :: (TileIndex,TileIndex) -> Size -> Random TileMap
-randomTileMap rng = fmap TileMap . randomGrid rng
+randomTileMap rng sz = fmap (TileMap sz) . randomGrid rng $ sz
 
 ppTileMap :: TileMap -> String
 ppTileMap = ppGrid . tileMap

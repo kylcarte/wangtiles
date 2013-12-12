@@ -1,3 +1,4 @@
+{-# LANGUAGE ExistentialQuantification #-}
 
 module Display where
 
@@ -12,72 +13,78 @@ import Graphics.Gloss hiding (Color)
 
 data TextureSet a = TextureSet
   { textureSet    :: TileSet (Picture,a)
-  , textureSize   :: (Float,Float)
+  , textureSize   :: FSize
   , renderTexture :: Picture -> a -> Picture
   }
 
-tileTexture :: Show a => TextureSet a -> TileIndex -> (Picture,a)
+tileTexture :: TextureSet a -> TileIndex -> (Picture,a)
 tileTexture = tsIndex . textureSet
 
 mkTextureSet :: (Picture -> a -> Picture) -> TileSetConfig
   -> TileSet (Picture,a) -> TextureSet a
 mkTextureSet rndr cfg ts = TextureSet
   { textureSet    = ts
-  , textureSize   = onPair toEnum $ tileSize cfg
+  , textureSize   = cast $ tileSize cfg
   , renderTexture = rndr
   }
 
 mkTextureSet_ :: TileSetConfig -> TileSet Picture -> TextureSet ()
 mkTextureSet_ cfg tp = TextureSet
   { textureSet  = tzip tp $ repeat ()
-  , textureSize = onPair toEnum $ tileSize cfg
+  , textureSize = cast $ tileSize cfg
   , renderTexture = const
   }
 
 -- }}}
 
-displayTileMap :: Show a => RenderConfig -> TextureSet a -> Size -> TileMap -> IO ()
-displayTileMap cfg ts sz tm = display mode (windowBackground cfg)
-    $ scaleToWindow
-    $ centerInWindow
-    $ renderTileMap cfg ts tm
+displayPicture :: RenderConfig -> Size -> FSize -> Picture -> IO ()
+displayPicture cfg gs ts p = display mode (windowBackground cfg)
+  . scaleToWindow
+  . centerInWindow
+  $ p
   where
-  (h,v) = gridDimensions cfg ts sz
+  sz = gridDimensions cfg gs ts
   res   = screenSize cfg
   --
   availRes = toEnum res - (2 * screenBorder cfg)
-  sc = availRes / max h v
+  sc = availRes / fToFSize max sz
   scaleToWindow = scale sc sc
   --
-  centerInWindow = translate (-(v/2)) (h/2)
+  centerInWindow = move $ fReflY $ sz / 2 -- (-(h/2)) (w/2)
   --
   mode = InWindow "gloss" (res,res) (0,0)
 
-renderTileMap :: Show a => RenderConfig -> TextureSet a -> TileMap -> Picture
+displayLayers :: RenderConfig -> Size -> FSize -> [Picture] -> IO ()
+displayLayers cfg gs ts = displayPicture cfg gs ts . pictures
+
+displayTileMap :: RenderConfig -> TextureSet a -> TileMap -> IO ()
+displayTileMap cfg txs tm = displayPicture cfg
+  (tmSize tm)
+  (textureSize txs)
+  $ renderTileMap cfg txs tm
+
+renderTileMap :: RenderConfig -> TextureSet a -> TileMap -> Picture
 renderTileMap cfg ts tm = moveToOrigin
   . pictures
-  . map ( render
-        . fmap (tileTexture ts)
-        )
+  . map (render . fmap (tileTexture ts))
   . tmAssocs
   $ tm
   where
-  moveToOrigin = translate radX (-radY)
+  moveToOrigin = move $ fReflX $ textureSize ts / 2
   render (c,(p,_)) = moveTileToCoord cfg ts c p
-  (radX,radY) = onPair (/2) $ textureSize ts
 
 moveTileToCoord :: RenderConfig -> TextureSet a -> Coord -> Picture -> Picture
-moveTileToCoord rc ts (c,r) = translate (toEnum c * kx) (-(toEnum r * ky))
+moveTileToCoord cfg ts cd = move $ fReflX $ cast cd * (sz + enum2 sp)
   where
-  sp = tileSpacing rc
-  (kx,ky) = onPair (+ sp) $ textureSize ts
-
-gridDimensions :: RenderConfig -> TextureSet a -> Size -> (Float,Float)
-gridDimensions cfg ts sz = (horiz,vert)
-  where
-  (c,r) = onPair toEnum sz
-  horiz = (szX * c) + (sp * (c - 1))
-  vert  = (szY * r) + (sp * (r - 1))
-  (szX,szY) = textureSize ts
+  sz = textureSize ts
   sp = tileSpacing cfg
+
+gridDimensions :: RenderConfig -> Size -> FSize -> FSize
+gridDimensions cfg gs ts = sz * ts + sp * (sz - 1)
+  where
+  sz = cast gs
+  sp = enum2 $ tileSpacing cfg
+
+move :: FSize -> Picture -> Picture
+move = fToFSize translate
 

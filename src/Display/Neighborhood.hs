@@ -1,16 +1,14 @@
 
 module Display.Neighborhood where
 
-import Tile
-import Tile.Neighborhood
 import Config.Render
 import Config.TileSet
 import Display
-
-type NeighborhoodTextureSet = TextureSet Neighborhood
+import Tile
+import Tile.Neighborhood
 
 displayNeighborhoodTileMap :: RenderConfig
-  -> NeighborhoodTextureSet -> Size -> TileMap -> IO ()
+  -> NeighborhoodTextureSet -> TileMap -> IO ()
 displayNeighborhoodTileMap = displayTileMap
 
 mkNeighborhoodTextureSet :: TileSetConfig

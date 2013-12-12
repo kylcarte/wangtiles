@@ -3,8 +3,6 @@
 
 module Tile.Wang where
 
-import Control.Arrow (first,second)
-import Data.List (sortBy)
 import qualified Data.Set as S
 import qualified Data.Map as M
 
@@ -134,16 +132,12 @@ tileTexture = tsIndex
 
 -- TileMap {{{
 
--- Wang-tile a subset of the TileMap that maps to a given TileIndex.
-wangSubMap :: WangTileSet -> TileIndex -> TileMap -> Random TileMap
-wangSubMap ts ti = wangTileMap ts . tmSubMap ti
+wangTileMapByIndex :: WangTileSet -> TileIndex -> TileMap -> Random TileMap
+wangTileMapByIndex ts ti tm = wangTileMap ts tm $ tmSubMapByValue ti tm
 
 -- Wang-tile the contents of the TileMap.
-wangTileMap :: WangTileSet -> TileMap -> Random TileMap
-wangTileMap ts tm = tmUpdateWithKeyAtM coords fn tm
-  where
-  fn c _ = randomWangTile ts tm c
-  coords = sortBy compareCoordsLexi $ tmCoords tm
+wangTileMap :: WangTileSet -> TileMap -> Coords -> Random TileMap
+wangTileMap ts = csGenerateTileMapA . randomWangTile ts
 
 -- TODO: generalize. how do we capture which tiles have already been
 --   handled?
@@ -153,8 +147,8 @@ wangTileMap ts tm = tmUpdateWithKeyAtM coords fn tm
 randomWangTile :: WangTileSet -> TileMap -> Coord -> Random TileIndex
 randomWangTile ts tm cd = tsRandomIndex suitable
   where
-  left = first  pred cd
-  up   = second pred cd
+  left = onHorizontal pred cd
+  up   = onVertical   pred cd
   suitable = selectTiles cs ts
   cs = colorConstraints $ concat
          [ if col cd == 0 then [] else [ ( West  , edgeColorAt left East  ) ]

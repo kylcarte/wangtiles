@@ -1,6 +1,7 @@
 
 module Tile.Neighborhood where
 
+import Display
 import Tile
 import Util
 
@@ -194,14 +195,16 @@ mkNeighborhoods = tsMap relax . tsFromList . zip [0..]
 
 -- TileMap {{{
 
--- No special traversal strategy needed
-neighborhoodTileMap :: NeighborhoodTileSet -> TileIndex
-  -> TileMap -> Either (Coord,TileIndex) TileMap
-neighborhoodTileMap ts ti tm = tmTraverseWithKey fn $ tmSubMap ti tm
+type NeighborhoodTextureSet = TextureSet Neighborhood
+
+neighborhoodTileMapByIndex :: NeighborhoodTextureSet -> TileIndex
+  -> TileMap -> Either Coord TileMap
+neighborhoodTileMapByIndex ts ti tm = neighborhoodTileMap ts tm $ tmSubMapByValue ti tm
+
+neighborhoodTileMap :: NeighborhoodTextureSet -> TileMap -> Coords -> Either Coord TileMap
+neighborhoodTileMap ts tm = csGenerateTileMapA fn
   where
-  fn c i = case tmMatch ts tm c of
-    Just i' -> return i'
-    Nothing -> Left (c,i)
+  fn c = maybe (Left c) return $ tmMatch (textureSet ts) tm c
 
 tmMatch :: NeighborhoodTileSet -> TileMap -> Coord
   -> Maybe TileIndex

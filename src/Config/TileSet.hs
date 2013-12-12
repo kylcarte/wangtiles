@@ -2,34 +2,34 @@
 
 module Config.TileSet where
 
-import Util hiding (Random(..))
+import Util
 
 import Control.Applicative
 import Control.Monad
 import Data.Aeson
 import Data.Aeson.Types
 import qualified Data.Map as M
-import qualified Data.Text as T
+import Data.Text (Text, unpack)
 import Data.Traversable (traverse)
 
 -- TileSetConfig {{{
 
 data TileSetConfig = TileSetConfig
   { textureFile    :: FilePath
-  , tileSize       :: (Int,Int)
-  , ignoreTiles    :: [(Int,Int)]
+  , tileSize       :: Size
+  , ignoreTiles    :: [Coord]
   } deriving (Eq,Show)
 
 instance FromJSON TileSetConfig where
   parseJSON (Object o) = 
         TileSetConfig
-    <$> o .:               "texture-file"
-    <*> o `getSize`        "tile-size"
-    <*> o `getIgnoreTiles` "ignore-tiles"
+    <$> o .:  "texture-file"
+    <*> o .:  "tile-size"
+    <*> o .:? "ignore-tiles" .!= []
     where
   parseJSON _ = mzero
 
-getSize :: Object -> T.Text -> Parser (Int,Int)
+getSize :: Object -> Text -> Parser (Int,Int)
 getSize o f = do
   sz <- o .: f
   (,) <$> sz .: "width"
@@ -40,7 +40,7 @@ getCoords o = do
   (,) <$> o .: "col"
       <*> o .: "row"
 
-getIgnoreTiles :: Object -> T.Text -> Parser [(Int,Int)]
+getIgnoreTiles :: Object -> Text -> Parser [(Int,Int)]
 getIgnoreTiles o f = do
   ig <- o .:? f
   case ig of
@@ -52,15 +52,17 @@ loadTileSetConfig = decodeFile
 
 -- }}}
 
-type TileSets = M.Map T.Text TileSetConfig
+type TileSets = M.Map Text TileSetConfig
 
 loadTileSets :: FilePath -> IO TileSets
 loadTileSets f = decodeFile f >>= traverse loadTileSetConfig
 
-lookupTileSetConfig :: TileSets -> T.Text -> IO TileSetConfig
-lookupTileSetConfig = flip lookupIO
+lookupTileSetConfig :: TileSets -> Text -> IO TileSetConfig
+lookupTileSetConfig tss n = io errMsg $ M.lookup n tss
+  where
+  errMsg = "TileSet '" ++ unpack n ++ "' not configured"
 
-loadTileSet :: FilePath -> T.Text -> IO TileSetConfig
+loadTileSet :: FilePath -> Text -> IO TileSetConfig
 loadTileSet f n = do
   tss <- loadTileSets f
   lookupTileSetConfig tss n

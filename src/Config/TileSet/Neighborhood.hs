@@ -3,15 +3,22 @@
 module Config.TileSet.Neighborhood where
 
 import Config.TileSet
+import Display.Neighborhood
+import Texture
 import Tile
 import Tile.Neighborhood
-import Texture
+import Util
 
-loadNeighborhoodTileSet :: TileSetConfig
-  -> TileSet Neighborhood -> IO NeighborhoodTileSet
-loadNeighborhoodTileSet cfg ts = do
-  texm <- loadTextureMap cfg
-  maybe err return $ tsZipR texm ts
+import Data.Text (Text)
+
+loadNeighborhoodTextureSet :: TileSets -> Text
+  -> TileSet Neighborhood -> IO NeighborhoodTextureSet
+loadNeighborhoodTextureSet tss n ts = do
+  cfg <- lookupTileSetConfig tss n
+  txm <- loadTextureMap cfg
+  nts <- io errMsg $ tsZipR txm ts
+  return $ mkNeighborhoodTextureSet cfg nts
   where
-  err = fail "TileSet mismatch"
+  errMsg = "Texture provided by TileSetConfig does not \
+             \contain sufficient textures for Neighborhood TileSet"
 
