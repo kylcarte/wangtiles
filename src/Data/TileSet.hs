@@ -14,6 +14,8 @@ newtype TileSet a = TileSet
   { tileSet :: I.IntMap a
   } deriving (Eq,Show,Functor,F.Foldable,T.Traversable)
 
+-- Indexing {{{
+
 tsSize :: TileSet a -> TileIndex
 tsSize = I.size . tileSet
 
@@ -28,6 +30,9 @@ tsIndex ts i = case I.lookup i $ tileSet ts of
   Just a -> a
   Nothing -> error $ "key " ++ show i ++ " is not in TileSet"
 
+tsLookup :: TileSet a -> TileIndex -> Maybe a
+tsLookup ts i = I.lookup i $ tileSet ts
+
 tsGetSingle :: TileSet a -> Maybe (TileIndex,a)
 tsGetSingle ts
   | [a] <- tsAssocs ts
@@ -35,14 +40,24 @@ tsGetSingle ts
   | otherwise
   = Nothing
 
+-- }}}
+
+-- Random {{{
+
 tsRandomIndex :: TileSet a -> Random TileIndex
 tsRandomIndex = randomKey . tileSet
+
+-- }}}
+
+-- Mapping {{{
 
 tsMap :: (a -> b) -> TileSet a -> TileSet b
 tsMap f = TileSet . fmap f . tileSet
 
 tsFilter :: (a -> Bool) -> TileSet a -> TileSet a
 tsFilter f = TileSet . I.filter f . tileSet
+
+-- }}}
 
 -- Zips {{{
 

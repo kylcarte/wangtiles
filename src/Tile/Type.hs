@@ -1,6 +1,6 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Tile.Wang where
+module Tile.Type where
 
 import Control.Monad.Trans.Random
 import Data.Grid
@@ -17,41 +17,8 @@ import qualified Data.Map as M
 import qualified Graphics.Gloss.Data.Color as Gloss
 
 instance TileLogic Wang where
-  type HasTileSets Wang tss = HasTileSet Wang tss
-  type Params Wang = TileIndex
-  lookupTile i tss = tsLookup (getTileSet tss) i
-
--- Tiles {{{
-
-wangTiles2x2 :: TileSet Wang
-wangTiles2x2 = mkTiles
-  [ ( Red   , Green , Blue   , Yellow )
-  , ( Green , Green , Blue   , Blue   )
-  , ( Red   , Red   , Yellow , Yellow )
-  , ( Green , Red   , Yellow , Blue   )
-  , ( Red   , Green , Yellow , Blue   )
-  , ( Green , Green , Yellow , Yellow )
-  , ( Red   , Red   , Blue   , Blue   )
-  , ( Green , Red   , Blue   , Yellow )
-  ]
-
-wangTiles2x3 :: TileSet Wang
-wangTiles2x3 = mkTiles
-  [ ( Red   , Green , Blue   , Yellow )
-  , ( Green , Red   , Blue   , Yellow )
-  , ( Red   , Red   , Yellow , Blue   )
-  , ( Green , Green , Yellow , Red    )
-  , ( Red   , Green , Red    , Yellow )
-  , ( Green , Red   , Red    , Blue   )
-  , ( Red   , Green , Blue   , Red    )
-  , ( Red   , Red   , Blue   , Red    )
-  , ( Green , Red   , Yellow , Red    )
-  , ( Red   , Green , Yellow , Blue   )
-  , ( Green , Green , Red    , Blue   )
-  , ( Green , Red   , Red    , Yellow )
-  ]
-
--- }}}
+  type HasTileSet Wang = HasWangTileSet
+  lookupTile tss = tsLookup $ wangTileSet tss
 
 -- Wang {{{
 

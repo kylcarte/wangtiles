@@ -19,10 +19,12 @@ library
   exposed-modules:     Tile
                        Tile.Wang
                        Tile.Neighborhood
+                       Tile.NW
                        Data.Grid
                        Data.Points
                        Data.Surrounding
                        Data.TileMap
+                       Data.TileMaps
                        Data.TileSet
                        Display
                        Display.Neighborhood
@@ -34,6 +36,8 @@ library
                        Config.TileSet.Neighborhood
                        Config.TileSet.Wang
                        -- Poisson
+                       Render
+                       Render.Wang
                        Texture
                        Util
   -- other-modules:       

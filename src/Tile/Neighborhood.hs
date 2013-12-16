@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeFamilies #-}
 
 module Tile.Neighborhood where
 
@@ -7,6 +8,7 @@ import Data.Surrounding
 import Data.TileMap
 import Data.TileSet
 import Display
+import Tile
 import Util
 
 import Control.Applicative
@@ -14,7 +16,10 @@ import Control.Monad
 import Data.List  (transpose)
 import Data.Maybe (fromMaybe)
 
-import Graphics.Gloss
+instance TileLogic Neighborhood where
+  type HasTileSets Neighborhood tss = HasTileSet Neighborhood tss
+  type Params Neighborhood = TileIndex
+  lookupTile i tss = tsLookup (getTileSet tss) i
 
 -- Neighborhoods {{{
 
@@ -106,7 +111,7 @@ tmMatches ts tm c = matchingNeighborhoods ts $ tmNeighborhood tm c
 
 matchingNeighborhoods :: NeighborhoodTileSet
   -> Neighborhood -> NeighborhoodTileSet
-matchingNeighborhoods ts n = tsFilter ((n ==) . snd) ts
+matchingNeighborhoods ts n = tsFilter (n ==) ts
 
 tmNeighborhood :: (Integral c) => TileMap c -> Coord c -> Neighborhood
 tmNeighborhood tm = mkNeighborhood . tmSurrounding tm
@@ -131,13 +136,16 @@ mkNeighborhood s = Neighborhood
 
 -- NeighborhoodTileSet {{{
 
-type NeighborhoodTileSet = TileSet (Picture,Neighborhood)
+class HasNeighborhoodTileSet tss where
+  neighborhoodTileSet :: tss -> NeighborhoodTileSet
+
+type NeighborhoodTileSet = TileSet Neighborhood
 
 neighborhoodAt :: NeighborhoodTileSet -> TileIndex -> Neighborhood
-neighborhoodAt ts i = snd $ neighborhoodTexture ts i
+neighborhoodAt ts i = neighborhoodTexture ts i
 
 neighborhoodTexture :: NeighborhoodTileSet -> TileIndex
-  -> (Picture,Neighborhood)
+  -> Neighborhood
 neighborhoodTexture = tsIndex
 
 -- }}}

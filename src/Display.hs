@@ -18,28 +18,30 @@ import Linear
 
 -- Instantiate to 'Size Float' ?
 data TextureSet a = TextureSet
-  { textureSet    :: TileSet (Picture,a)
+  { textureSet    :: TileSet a
   , textureSize   :: Size Float
   , renderTexture :: Picture -> a -> Picture
   }
 
-tileTexture :: TextureSet a -> TileIndex -> (Picture,a)
+tileTexture :: TextureSet a -> TileIndex -> a
 tileTexture = tsIndex . textureSet
 
 mkTextureSet :: (Picture -> a -> Picture) -> TileSetConfig
-  -> TileSet (Picture,a) -> TextureSet a
+  -> TileSet a -> TextureSet a
 mkTextureSet rndr cfg ts = TextureSet
   { textureSet  = ts
   , textureSize = toFloat <$> tileSize cfg
   , renderTexture = rndr
   }
 
-mkTextureSet_ :: TileSetConfig -> TileSet Picture -> TextureSet ()
-mkTextureSet_ cfg tp = TextureSet
+{-
+mkTextureSet_ :: TileSetConfig -> TextureSet ()
+mkTextureSet_ cfg = TextureSet
   { textureSet  = tzip tp $ repeat ()
   , textureSize = (toFloat <$> tileSize cfg)
   , renderTexture = const
   }
+-}
 
 -- }}}
 
@@ -88,7 +90,7 @@ renderTileMap cfg ts tm =
   $ tm
   where
   moveToOrigin = move $ reflX $ fmap toFloat $ size $ textureSize ts / 2
-  render (c,(p,_)) = moveTileToCoord cfg ts c p
+  render (c,_) = moveTileToCoord cfg ts c blank -- XXX
 
 moveTileToCoord :: (Enum c) => RenderConfig
   -> TextureSet a -> Coord c -> Picture -> Picture

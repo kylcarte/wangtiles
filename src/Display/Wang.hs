@@ -24,7 +24,7 @@ mkWangTextureSet cfg tsc = mkTextureSet (renderWangTile cfg rsz) tsc
   rsz = toFloat <$> tileSize tsc
 
 renderWangTile :: WangRenderConfig -> Size Float
-  -> Picture -> Tile -> Picture
+  -> Picture -> Wang -> Picture
 renderWangTile cfg rsz p t = pictures
   [ if wRenderEdges      cfg  then es else blank
   , if tileRenderTexture cfg' then p  else blank
