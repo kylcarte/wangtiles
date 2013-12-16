@@ -3,10 +3,14 @@
 
 module Tile.Wang where
 
+import Control.Monad.Trans.Random
+import Data.Grid
+import Data.Points
 import Display
 import Tile
 import Util
 
+import Control.Lens
 import qualified Data.Set as S
 import qualified Data.Map as M
 import Graphics.Gloss.Data.Picture
@@ -135,14 +139,17 @@ wangTexture = tsIndex
 
 type WangTextureSet = TextureSet Tile
 
-wangTileMapByIndex :: WangTextureSet -> TileIndex -> TileMap -> Random TileMap
+wangTileMapByIndex :: (Integral c, Ord c) => WangTextureSet
+  -> TileIndex -> TileMap c -> Random (Maybe (TileMap c))
 wangTileMapByIndex ts ti tm = wangTileMapAt ts tm $ tmSubMapByValue ti tm
 
 -- Wang-tile the contents of the TileMap.
-wangTileMapAt :: WangTextureSet -> TileMap -> Coords -> Random TileMap
-wangTileMapAt ts = csGenerateTileMapA . randomWangTile (textureSet ts)
+wangTileMapAt :: (Integral c) => WangTextureSet -> TileMap c
+  -> Coords c -> Random (Maybe (TileMap c))
+wangTileMapAt ts tm = csGenerateTileMapA $ randomWangTile (textureSet ts) tm
 
-wangTileMap :: WangTextureSet -> TileMap -> Random TileMap
+wangTileMap :: (Num c, Ord c) => WangTextureSet
+  -> TileMap c -> Random (TileMap c)
 wangTileMap ts tm = tmTraverseKeys (randomWangTile (textureSet ts) tm) tm
 
 -- TODO: generalize. how do we capture which tiles have already been
@@ -150,17 +157,17 @@ wangTileMap ts tm = tmTraverseKeys (randomWangTile (textureSet ts) tm) tm
 -- * look at surrounding tiles, with potential respective constraints
 -- * filter out which tiles don't need to provide constraints
 -- * gather constraints and select an appropriate tile.
-randomWangTile :: WangTileSet -> TileMap -> Coord -> Random TileIndex
+randomWangTile :: (Eq c, Ord c, Num c) => WangTileSet
+  -> TileMap c -> Coord c -> Random TileIndex
 randomWangTile ts tm cd = tsRandomIndex suitable
   where
-  left = onHorizontal pred cd
-  up   = onVertical   pred cd
+  left  = cd & col -~ 1
+  above = cd & row -~ 1
   suitable = selectTiles cs ts
   cs = colorConstraints $ concat
-         [ if col cd == 0 then [] else [ ( West  , edgeColorAt left East  ) ]
-         , if row cd == 0 then [] else [ ( North , edgeColorAt up   South ) ]
+         [ if cd^.col == 0 then [] else [ ( West  , edgeColorAt left  East  ) ]
+         , if cd^.row == 0 then [] else [ ( North , edgeColorAt above South ) ]
          ]
-  edgeColorAt :: Coord -> Edge -> Color
   edgeColorAt c e = edgeColor e . wangTileAt ts . flip tmIndex c $ tm
 
 -- }}}

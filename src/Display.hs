@@ -2,21 +2,24 @@
 
 module Display where
 
-import Data.Grid
 import Data.Points
 import Tile
 import Config.Render
 import Config.TileSet
 import Util
 
-import Graphics.Gloss hiding (Color)
+import Control.Applicative
+import Control.Lens
+import qualified Graphics.Gloss as Gloss
+import Graphics.Gloss hiding (Color, scale)
+import Linear
 
 -- TextureSet {{{
 
 -- Instantiate to 'Size Float' ?
-data TextureSet c a = TextureSet
+data TextureSet a = TextureSet
   { textureSet    :: TileSet (Picture,a)
-  , textureSize   :: Size c
+  , textureSize   :: Size Float
   , renderTexture :: Picture -> a -> Picture
   }
 
@@ -26,68 +29,84 @@ tileTexture = tsIndex . textureSet
 mkTextureSet :: (Picture -> a -> Picture) -> TileSetConfig
   -> TileSet (Picture,a) -> TextureSet a
 mkTextureSet rndr cfg ts = TextureSet
-  { textureSet    = ts
-  , textureSize   = upcastFloat2 $ tileSize cfg
+  { textureSet  = ts
+  , textureSize = toFloat <$> tileSize cfg
   , renderTexture = rndr
   }
 
 mkTextureSet_ :: TileSetConfig -> TileSet Picture -> TextureSet ()
 mkTextureSet_ cfg tp = TextureSet
   { textureSet  = tzip tp $ repeat ()
-  , textureSize = upcastFloat2 $ tileSize cfg
+  , textureSize = (toFloat <$> tileSize cfg)
   , renderTexture = const
   }
 
 -- }}}
 
-displayPicture :: RenderConfig -> Size -> FSize -> Picture -> IO ()
-displayPicture cfg gs ts p = display mode (windowBackground cfg)
+displayPicture :: (Enum c, Real f, Enum f, Fractional f) =>
+  RenderConfig -> Size c -> Size f -> Picture -> IO ()
+displayPicture cfg gs ts =
+  display mode (windowBackground cfg)
   . scaleToWindow
   . centerInWindow
-  $ p
   where
-  sz = gridDimensions cfg gs ts
-  res   = screenSize cfg
+  sz :: V2 Float
+  sz  = fmap toFloat $ size $ gridDimensions cfg gs ts
+  res :: Int
+  res = screenSize cfg
   --
-  availRes = toEnum res - (2 * screenBorder cfg)
-  sc = availRes / fToFSize max sz
-  scaleToWindow = scale sc sc
+  availRes :: Float
+  availRes = toFloat res - (2 * screenBorder cfg)
+  sc :: Float
+  sc = availRes / toV2 max sz
+  scaleToWindow :: Picture -> Picture
+  scaleToWindow = scale $ pure sc
   --
-  centerInWindow = move $ fReflY $ sz / 2 -- (-(h/2)) (w/2)
+  centerInWindow :: Picture -> Picture
+  centerInWindow = move $ reflY $ sz / 2 -- (-(h/2)) (w/2)
   --
   mode = InWindow "gloss" (res,res) (0,0)
 
-displayLayers :: RenderConfig -> Size -> FSize -> [Picture] -> IO ()
+displayLayers :: (Enum c, Real f, Enum f, Fractional f) =>
+  RenderConfig -> Size c -> Size f -> [Picture] -> IO ()
 displayLayers cfg gs ts = displayPicture cfg gs ts . pictures
 
-displayTileMap :: RenderConfig -> TextureSet a -> TileMap -> IO ()
+displayTileMap :: (Enum c) => RenderConfig
+  -> TextureSet a -> TileMap c -> IO ()
 displayTileMap cfg txs tm = displayPicture cfg
-  (tmSize tm)
+  (tm^.tmSize)
   (textureSize txs)
   $ renderTileMap cfg txs tm
 
-renderTileMap :: RenderConfig -> TextureSet a -> TileMap -> Picture
-renderTileMap cfg ts tm = moveToOrigin
+renderTileMap :: (Enum c) => RenderConfig
+  -> TextureSet a -> TileMap c -> Picture
+renderTileMap cfg ts tm =
+    moveToOrigin
   . pictures
   . map (render . fmap (tileTexture ts))
   . tmAssocs
   $ tm
   where
-  moveToOrigin = move $ fReflX $ textureSize ts / 2
+  moveToOrigin = move $ reflX $ fmap toFloat $ size $ textureSize ts / 2
   render (c,(p,_)) = moveTileToCoord cfg ts c p
 
-moveTileToCoord :: RenderConfig -> TextureSet a -> Coord -> Picture -> Picture
-moveTileToCoord cfg ts cd = move $ fReflX $ upcastFloat2 cd * (sz + float2 sp)
+moveTileToCoord :: (Enum c) => RenderConfig
+  -> TextureSet a -> Coord c -> Picture -> Picture
+moveTileToCoord cfg ts cd = move $ reflX $ (coord $ toFloat <$> cd) * (sz + sp)
   where
-  sz = textureSize ts
-  sp = tileSpacing cfg
+  sz = size $ toFloat <$> textureSize ts
+  sp = pure $ toFloat $ tileSpacing cfg
 
-gridDimensions :: RenderConfig -> Size -> FSize -> FSize
+gridDimensions :: (Enum c, Real f, Enum f, Fractional f) =>
+  RenderConfig -> Size c -> Size f -> Size f
 gridDimensions cfg gs ts = sz * ts + sp * (sz - 1)
   where
-  sz = upcastFloat2 gs
-  sp = float2 $ tileSpacing cfg
+  sz = fmap toFloat gs
+  sp = pure $ toFloat $ tileSpacing cfg
 
-move :: FSize -> Picture -> Picture
-move = fToFSize translate
+move :: V2 Float -> Picture -> Picture
+move = toV2 translate
+
+scale :: V2 Float -> Picture -> Picture
+scale = toV2 Gloss.scale
 

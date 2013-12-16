@@ -108,6 +108,30 @@ safeMaximum :: (Num (f a), Ord a, F.Foldable t, Additive f)
   => t (f a) -> f a
 safeMaximum = F.foldl' (liftU2 max) 0
 
+float :: (Real f, Enum f, Fractional f, Enum c) => Prism' f c
+float = prism' toF toC
+  where
+  toF :: (Enum c, Fractional f) => c -> f
+  toF = fromRational.toEnum.fromEnum
+  toC :: (Enum c, Real f, Enum f) => f -> Maybe c
+  toC r = if r == toEnum rt
+    then Just $ toEnum rt
+    else Nothing
+    where
+      rt = fromEnum $ toRational r
+
+onFloat :: (Enum f, Fractional f, Real f, Enum c) =>
+  (f -> f) -> c -> Maybe c
+onFloat = underPrism float
+
+fromFloat :: (Enum f, Fractional f, Real f, Enum c) =>
+  f -> Maybe c
+fromFloat = preview float
+
+toFloat :: (Enum f, Fractional f, Real f, Enum c) =>
+  c -> f
+toFloat = review float
+
 -- }}}
 
 -- Application combinators {{{
@@ -141,6 +165,13 @@ onPair f (x,y) = (f x,f y)
 
 dup :: a -> (a,a)
 dup a = (a,a)
+
+-- }}}
+
+-- V2 {{{
+
+toV2 :: (c -> c -> b) -> V2 c -> b
+toV2 f c = f (c^._x) (c^._y)
 
 -- }}}
 
@@ -183,6 +214,9 @@ lift2IsoM i =
   . curry
   . lmap (first $ down i)
   . uncurry
+
+underPrism :: Prism' down up -> (down -> down) -> up -> Maybe up
+underPrism pr f = preview pr . f . review pr
 
 -- }}}
 

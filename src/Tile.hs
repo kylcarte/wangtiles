@@ -13,7 +13,6 @@ import Util
 import Control.Applicative
 import Control.Lens
 import qualified Data.IntMap as I
-import qualified Data.Map as M
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 
