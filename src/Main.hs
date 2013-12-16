@@ -5,7 +5,9 @@ import Config.Render.Wang
 import Config.TileSet
 import Config.TileSet.Neighborhood
 import Config.TileSet.Wang
+import Data.Grid
 import Data.Points
+import Data.TileMap
 import Display
 import Display.Neighborhood
 import Display.Wang
@@ -48,8 +50,11 @@ main = do
   rtm <- io' $ randomTileMap (0,1) sz
   tm1 <- io' $ neighborhoodTileMapByIndex blob  0 rtm
   tm2 <- io' $ neighborhoodTileMapByIndex fence 1 rtm
-  displayLayers rc sz (textureSize blob)
-    $ map (uncurry $ renderTileMap rc) [(blob,tm1),(fence,tm2)]
+  let sz' = mkSize 10 5
+  putStrLn $ ppTileMap neighTM
+  displayTileMap rc blob sz' neighTM
+  -- displayLayers rc sz (textureSize blob)
+  --   $ map (uncurry $ renderTileMap rc) [(blob,tm1),(fence,tm2)]
 
   -- grass <- loadWangTextureSet wrc tss "grass" wangTiles2x2
   -- let tm = mkEmptyTileMap sz

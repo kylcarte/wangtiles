@@ -3,9 +3,9 @@
 module Config.TileSet.Neighborhood where
 
 import Config.TileSet
+import Data.TileSet
 import Display.Neighborhood
 import Texture
-import Tile
 import Tile.Neighborhood
 import Util
 

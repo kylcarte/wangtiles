@@ -5,7 +5,7 @@ module Texture where
 
 import Config.TileSet
 import Data.Points
-import Tile
+import Data.TileSet
 import Util
 
 import Control.Arrow ((&&&))

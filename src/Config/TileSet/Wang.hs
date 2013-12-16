@@ -4,8 +4,8 @@ module Config.TileSet.Wang where
 
 import Config.Render.Wang
 import Config.TileSet
+import Data.TileSet
 import Display.Wang
-import Tile
 import Tile.Wang
 import Texture
 import Util

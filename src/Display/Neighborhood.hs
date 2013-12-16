@@ -3,9 +3,9 @@ module Display.Neighborhood where
 
 import Config.Render
 import Config.TileSet
+import Data.TileMap
 import Data.Points
 import Display
-import Tile
 import Tile.Neighborhood
 
 displayNeighborhoodTileMap :: (Enum c) => RenderConfig

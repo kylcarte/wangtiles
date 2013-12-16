@@ -19,6 +19,7 @@ import Control.Monad.Trans.Random
 import Data.Aeson
 import Data.Foldable (Foldable(..))
 import Data.Maybe (mapMaybe)
+import Data.Monoid
 import Linear
 import qualified System.Random as R
 
@@ -27,11 +28,17 @@ import qualified System.Random as R
 newtype Coord c = Coord
   { coord :: V2 c
   } deriving
-    ( Eq , Ord , Show , Num , Fractional
-    , Epsilon , R1 , R2
-    , Functor , Applicative , Monad
-    , Foldable , Traversable
+    ( Eq, Show, Num, Fractional
+    , Epsilon, R1, R2
+    , Functor, Applicative, Monad
+    , Foldable, Traversable
     )
+
+instance (Ord c) => Ord (Coord c) where
+  compare c1 c2 = (c1 `cRows` c2) <> (c1 `cCols` c2)
+    where
+    cCols = compare `on` view col
+    cRows = compare `on` view row
 
 mkCoord :: c -> c -> Coord c
 mkCoord = Coord .:. V2
@@ -156,7 +163,7 @@ coordInt sz = prism' toInt fromInt
   where
   (w,h) = sz & width `view2` height
   toInt c = fromEnum $ w * c^.row + c^.col
-  fromInt i = if r < w && c < h
+  fromInt i = if c < w && r < h
     then Just $ mkCoord c r
     else Nothing
     where

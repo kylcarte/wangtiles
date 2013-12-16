@@ -3,7 +3,8 @@
 module Display where
 
 import Data.Points
-import Tile
+import Data.TileMap
+import Data.TileSet
 import Config.Render
 import Config.TileSet
 import Util

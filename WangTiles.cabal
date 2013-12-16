@@ -21,6 +21,9 @@ library
                        Tile.Neighborhood
                        Data.Grid
                        Data.Points
+                       Data.Surrounding
+                       Data.TileMap
+                       Data.TileSet
                        Display
                        Display.Neighborhood
                        Display.Wang

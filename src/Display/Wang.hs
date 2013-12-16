@@ -5,8 +5,8 @@ import Config.Render
 import Config.Render.Wang
 import Config.TileSet
 import Data.Points
+import Data.TileMap
 import Display
-import Tile
 import Tile.Wang
 import Util
 

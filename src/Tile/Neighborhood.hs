@@ -3,8 +3,10 @@ module Tile.Neighborhood where
 
 import Data.Grid
 import Data.Points
+import Data.Surrounding
+import Data.TileMap
+import Data.TileSet
 import Display
-import Tile
 import Util
 
 import Control.Applicative

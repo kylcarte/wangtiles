@@ -6,8 +6,9 @@ module Tile.Wang where
 import Control.Monad.Trans.Random
 import Data.Grid
 import Data.Points
+import Data.TileMap
+import Data.TileSet
 import Display
-import Tile
 import Util
 
 import Control.Lens
