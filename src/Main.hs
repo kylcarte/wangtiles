@@ -44,9 +44,9 @@ main = do
 
   blob  <- loadNeighborhoodTextureSet tss "blob"  neighborhood8
   fence <- loadNeighborhoodTextureSet tss "fence" neighborhood4
-  rtm <- io' $ randomTileMap (0,1) sz
-  tm1 <- neighborhoodIO $ neighborhoodTileMapByIndex blob  0 rtm
-  tm2 <- neighborhoodIO $ neighborhoodTileMapByIndex fence 1 rtm
+  -- rtm <- io' $ randomTileMap (0,1) sz
+  -- tm1 <- neighborhoodIO $ neighborhoodTileMapByIndex blob  0 rtm
+  -- tm2 <- neighborhoodIO $ neighborhoodTileMapByIndex fence 1 rtm
 
   grass <- loadWangTextureSet wrc tss "grass" wangTiles2x2
   let tm = mkEmptyTileMap sz

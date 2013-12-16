@@ -2,12 +2,12 @@
 
 module Config.TileSet where
 
+import Data.Points
 import Util
 
 import Control.Applicative
 import Control.Monad
 import Data.Aeson
-import Data.Aeson.Types
 import qualified Data.Map as M
 import Data.Text (Text, unpack)
 import Data.Traversable (traverse)
@@ -16,8 +16,8 @@ import Data.Traversable (traverse)
 
 data TileSetConfig = TileSetConfig
   { textureFile    :: FilePath
-  , tileSize       :: Size
-  , ignoreTiles    :: [Coord]
+  , tileSize       :: Size Int
+  , ignoreTiles    :: [Coord Int]
   } deriving (Eq,Show)
 
 instance FromJSON TileSetConfig where
@@ -28,24 +28,6 @@ instance FromJSON TileSetConfig where
     <*> o .:? "ignore-tiles" .!= []
     where
   parseJSON _ = mzero
-
-getSize :: Object -> Text -> Parser (Int,Int)
-getSize o f = do
-  sz <- o .: f
-  (,) <$> sz .: "width"
-      <*> sz .: "height"
-
-getCoords :: Object -> Parser (Int,Int)
-getCoords o = do
-  (,) <$> o .: "col"
-      <*> o .: "row"
-
-getIgnoreTiles :: Object -> Text -> Parser [(Int,Int)]
-getIgnoreTiles o f = do
-  ig <- o .:? f
-  case ig of
-    Nothing -> return []
-    Just l  -> mapM getCoords l
 
 loadTileSetConfig :: FilePath -> IO TileSetConfig
 loadTileSetConfig = decodeFile

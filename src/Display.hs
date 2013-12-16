@@ -2,6 +2,8 @@
 
 module Display where
 
+import Data.Grid
+import Data.Points
 import Tile
 import Config.Render
 import Config.TileSet
@@ -11,9 +13,10 @@ import Graphics.Gloss hiding (Color)
 
 -- TextureSet {{{
 
-data TextureSet a = TextureSet
+-- Instantiate to 'Size Float' ?
+data TextureSet c a = TextureSet
   { textureSet    :: TileSet (Picture,a)
-  , textureSize   :: FSize
+  , textureSize   :: Size c
   , renderTexture :: Picture -> a -> Picture
   }
 
@@ -24,14 +27,14 @@ mkTextureSet :: (Picture -> a -> Picture) -> TileSetConfig
   -> TileSet (Picture,a) -> TextureSet a
 mkTextureSet rndr cfg ts = TextureSet
   { textureSet    = ts
-  , textureSize   = cast $ tileSize cfg
+  , textureSize   = upcastFloat2 $ tileSize cfg
   , renderTexture = rndr
   }
 
 mkTextureSet_ :: TileSetConfig -> TileSet Picture -> TextureSet ()
 mkTextureSet_ cfg tp = TextureSet
   { textureSet  = tzip tp $ repeat ()
-  , textureSize = cast $ tileSize cfg
+  , textureSize = upcastFloat2 $ tileSize cfg
   , renderTexture = const
   }
 
@@ -74,7 +77,7 @@ renderTileMap cfg ts tm = moveToOrigin
   render (c,(p,_)) = moveTileToCoord cfg ts c p
 
 moveTileToCoord :: RenderConfig -> TextureSet a -> Coord -> Picture -> Picture
-moveTileToCoord cfg ts cd = move $ fReflX $ cast cd * (sz + enum2 sp)
+moveTileToCoord cfg ts cd = move $ fReflX $ upcastFloat2 cd * (sz + float2 sp)
   where
   sz = textureSize ts
   sp = tileSpacing cfg
@@ -82,8 +85,8 @@ moveTileToCoord cfg ts cd = move $ fReflX $ cast cd * (sz + enum2 sp)
 gridDimensions :: RenderConfig -> Size -> FSize -> FSize
 gridDimensions cfg gs ts = sz * ts + sp * (sz - 1)
   where
-  sz = cast gs
-  sp = enum2 $ tileSpacing cfg
+  sz = upcastFloat2 gs
+  sp = float2 $ tileSpacing cfg
 
 move :: FSize -> Picture -> Picture
 move = fToFSize translate

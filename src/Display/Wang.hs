@@ -18,7 +18,7 @@ mkWangTextureSet :: WangRenderConfig -> TileSetConfig
   -> WangTileSet -> WangTextureSet
 mkWangTextureSet cfg tsc = mkTextureSet (renderWangTile cfg rsz) tsc
   where
-  rsz = cast $ tileSize tsc
+  rsz = upcastFloat2 $ tileSize tsc
 
 renderWangTile :: WangRenderConfig -> FSize
   -> Picture -> Tile -> Picture
