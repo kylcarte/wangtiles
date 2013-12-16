@@ -5,6 +5,7 @@ import Config.Render.Wang
 import Config.TileSet
 import Config.TileSet.Neighborhood
 import Config.TileSet.Wang
+import Data.Points
 import Display
 import Display.Neighborhood
 import Display.Wang
@@ -25,11 +26,11 @@ import Graphics.Gloss
 -- TODO: * support layers of texture rendering
 --       * improve efficiency/memory usage for large grids
 
-parseArgs :: IO Size
+parseArgs :: IO (Size Int)
 parseArgs = do
   as <- getArgs
   case as of
-    [c,r] -> return $ fromWidthHeight (read c,read r)
+    [c,r] -> return $ mkSize (read c) (read r)
     _       -> usage >> exitFailure
 
 usage :: IO ()
@@ -44,17 +45,16 @@ main = do
 
   blob  <- loadNeighborhoodTextureSet tss "blob"  neighborhood8
   fence <- loadNeighborhoodTextureSet tss "fence" neighborhood4
-  -- rtm <- io' $ randomTileMap (0,1) sz
-  -- tm1 <- neighborhoodIO $ neighborhoodTileMapByIndex blob  0 rtm
-  -- tm2 <- neighborhoodIO $ neighborhoodTileMapByIndex fence 1 rtm
+  rtm <- io' $ randomTileMap (0,1) sz
+  tm1 <- io' $ neighborhoodTileMapByIndex blob  0 rtm
+  tm2 <- io' $ neighborhoodTileMapByIndex fence 1 rtm
+  displayLayers rc (_tmSize rtm) (textureSize blob)
+    $ map (uncurry $ renderTileMap rc) [(blob,tm1),(fence,tm2)]
 
-  grass <- loadWangTextureSet wrc tss "grass" wangTiles2x2
-  let tm = mkEmptyTileMap sz
-  tm3 <- wangIO $ wangTileMap grass tm
-
-  displayTileMap rc grass tm3
-  -- displayLayers rc (tmSize rtm) (textureSize blob)
-  --   $ map (uncurry $ renderTileMap rc) [(blob,tm1),(fence,tm2)]
+  -- grass <- loadWangTextureSet wrc tss "grass" wangTiles2x2
+  -- let tm = mkEmptyTileMap sz
+  -- tm3 <- io' $ wangTileMap grass tm
+  -- displayTileMap rc grass tm3
   where
   rc = defaultRenderConfig { windowBackground = black }
   wrc = defaultWangRenderConfig { wRenderConfig = rc }

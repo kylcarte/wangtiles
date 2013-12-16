@@ -1,5 +1,6 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Util
   ( module Util
@@ -32,11 +33,9 @@ class (Functor m) => HandleIO m where
   io' :: m a -> IO a
   io' = io "HandleIO failure"
 
-{-
 instance HandleIO Random where
   io _ = runRandomIO
   io'  = io "failure in Random"
--}
 
 instance (Show e) => HandleIO (Either e) where
   io msg m = case m of
