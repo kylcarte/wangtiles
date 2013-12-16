@@ -140,12 +140,12 @@ wangTexture = tsIndex
 type WangTextureSet = TextureSet Tile
 
 wangTileMapByIndex :: (Integral c, Ord c) => WangTextureSet
-  -> TileIndex -> TileMap c -> Random (Maybe (TileMap c))
+  -> TileIndex -> TileMap c -> Random (TileMap c)
 wangTileMapByIndex ts ti tm = wangTileMapAt ts tm $ tmSubMapByValue ti tm
 
 -- Wang-tile the contents of the TileMap.
 wangTileMapAt :: (Integral c) => WangTextureSet -> TileMap c
-  -> Coords c -> Random (Maybe (TileMap c))
+  -> Coords c -> Random (TileMap c)
 wangTileMapAt ts tm = csGenerateTileMapA $ randomWangTile (textureSet ts) tm
 
 wangTileMap :: (Num c, Ord c) => WangTextureSet

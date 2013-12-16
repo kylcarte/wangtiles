@@ -41,18 +41,18 @@ mkRandomGrid rng sz = T.traverse f . mkEmptyGrid sz =<< random
   f :: a -> Random a
   f = const $ randomR rng
 
-gridSize :: (Integral c) => Grid c a -> Maybe (Size c)
+gridSize :: (Integral c) => Grid c a -> Size c
 gridSize =
-    fmap (uncurry (-))
-  . both (preview sizeV2)
+    uncurry (-)
+  . over both Size
   . (safeMinimum &&& safeMaximum)
   . map (view coordV2)
   . M.keys
   . _grid
 
-gridRows, gridCols :: (Integral c) => Grid c a -> Maybe c
-gridRows = fmap (view height) . gridSize
-gridCols = fmap (view  width) . gridSize
+gridRows, gridCols :: (Integral c) => Grid c a -> c
+gridRows = view height . gridSize
+gridCols = view  width . gridSize
 
 gridMap :: (M.Map (Coord c) a -> M.Map (Coord c) b) -> Grid c a -> Grid c b
 gridMap = (grid %~)

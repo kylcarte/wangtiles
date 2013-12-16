@@ -3,11 +3,13 @@
 
 module Texture where
 
+import Config.TileSet
+import Data.Points
 import Tile
 import Util
-import Config.TileSet
 
 import Control.Arrow ((&&&))
+import Control.Lens
 import Data.Maybe (catMaybes)
 import qualified Data.Map as M
 import qualified Data.Traversable as T
@@ -22,21 +24,21 @@ loadTextureMap cfg = readImage (textureFile cfg) >>= splitAndRender
     . tsFromList
     . flattenAndIndex
     . map (map fromDynamicImage)
-    . deleteGridIndices (ignoreTiles cfg)
+    . deleteGridIndices
+        (map (view colRow) $ ignoreTiles cfg)
     . splitImage (tileSize cfg)
   flattenAndIndex :: [[Maybe a]] -> [(Int,a)]
   flattenAndIndex = zip [0..] . catMaybes . concat
 
-mkTextureMap :: M.Map Coord Picture
-  -> TileSet Coord
-  -> Maybe (TileSet Picture)
+mkTextureMap :: (Ord c) => M.Map (Coord c) Picture
+  -> TileSet (Coord c) -> Maybe (TileSet Picture)
 mkTextureMap = T.traverse . flip M.lookup
 
-splitImage :: Size -> DynamicImage -> [[DynamicImage]]
+splitImage :: (Show c, Integral c) => Size c -> DynamicImage -> [[DynamicImage]]
 splitImage ts img
   | 0 <- imgX `mod` tileX
   , 0 <- imgY `mod` tileY
-  = [ [ subImage (Coord { col = x , row = y }) ts img
+  = [ [ subImage (mkCoord x y) ts img
       | x <- [0,tileX..(imgX - 1)]
       ]
     | y <- [0,tileY..(imgY - 1)]
@@ -47,19 +49,24 @@ splitImage ts img
       " does not fit tiles of size " ++
       show tileX ++ "x" ++ show tileY
   where
-  (tileX,tileY) = widthHeight ts
-  (imgX,imgY) = diWidthHeight img
+  (tileX,tileY) = view widthHeight ts
+  (imgX,imgY)   = over both toEnum $ diWidthHeight img
 
-subImage :: Coord -> Size -> DynamicImage -> DynamicImage
+subImage :: (Enum c) => Coord c -> Size c -> DynamicImage -> DynamicImage
 subImage cd sz = mapDynamicImage $ mkSubImage cd sz
 
-mkSubImage :: Pixel a => Coord -> Size -> Image a -> Image a
-mkSubImage cd sz i = flip fToSize sz
-  $ generateImage
-  $ pixelFromCoord i cd
+mkSubImage :: (Enum c, Pixel a) => Coord c -> Size c -> Image a -> Image a
+mkSubImage cd sz i =
+    flip toSize s
+  . generateImage
+  . pixelFromCoord i
+  $ c
+  where
+  c = fmap fromEnum cd
+  s = fmap fromEnum sz
 
-pixelFromCoord :: Pixel a => Image a -> Coord -> Int -> Int -> a
-pixelFromCoord i cd = fFromCoord $ fToCoord (pixelAt i) . (cd +)
+pixelFromCoord :: Pixel a => Image a -> Coord Int -> Int -> Int -> a
+pixelFromCoord i cd = fromCoord $ toCoord (pixelAt i) . (cd +)
 
 -- DynamicImage {{{
 

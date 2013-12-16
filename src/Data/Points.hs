@@ -185,6 +185,12 @@ lexMaxBound sz = coordIndex sz $ Coord $ size (sz - 1)
 
 -- V2 Transformations {{{
 
+projX :: Num a => V2 a -> V2 a
+projX = _y .~ 0
+
+projY :: Num a => V2 a -> V2 a
+projY = _x .~ 0
+
 reflX :: Num a => V2 a -> V2 a
 reflX = _y %~ negate
 

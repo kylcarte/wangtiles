@@ -7,8 +7,8 @@ import Display
 import Tile
 import Tile.Neighborhood
 
-displayNeighborhoodTileMap :: RenderConfig
-  -> NeighborhoodTextureSet -> TileMap -> IO ()
+displayNeighborhoodTileMap :: (Enum c) => RenderConfig
+  -> NeighborhoodTextureSet -> TileMap c -> IO ()
 displayNeighborhoodTileMap = displayTileMap
 
 mkNeighborhoodTextureSet :: TileSetConfig

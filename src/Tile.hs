@@ -117,13 +117,11 @@ makeLenses ''TileMap
 tmSurrounding :: (Integral c) => TileMap c -> Coord c -> Surrounding TileIndex
 tmSurrounding = gridSurrounding . _tileMap
 
-tmFromGrid :: (Integral c) => Grid c TileIndex -> Maybe (TileMap c)
-tmFromGrid g = do
-  sz <- gridSize g
-  return $ TileMap
-    { _tmSize  = sz
-    , _tileMap = g
-    }
+tmFromGrid :: (Integral c) => Grid c TileIndex -> TileMap c
+tmFromGrid g = TileMap
+  { _tmSize  = gridSize g
+  , _tileMap = g
+  }
 
 tmOnGrid :: (Grid c TileIndex -> Grid c TileIndex) -> TileMap c -> TileMap c
 tmOnGrid f = tileMap %~ f
@@ -139,7 +137,7 @@ tmOnGridM f tm = do
   g <- f (tm^.tileMap)
   return $ tm { _tileMap = g }
 
-mkEmptyTileMap :: (Integral c) => Size c -> Maybe (TileMap c)
+mkEmptyTileMap :: (Integral c) => Size c -> TileMap c
 mkEmptyTileMap sz = tmFromGrid $ mkEmptyGrid sz 0
 
 tmSubMap :: (Ord c) => Coords c -> TileMap c -> TileMap c
@@ -148,16 +146,16 @@ tmSubMap = tmOnGrid . gridSubMap
 tmSubMapByValue :: (Ord c) => TileIndex -> TileMap c -> Coords c
 tmSubMapByValue ti = (() <$) . gridSubMapByValue ti . _tileMap
 
-tmFromList :: (Integral c) => [(Coord c,TileIndex)] -> Maybe (TileMap c)
+tmFromList :: (Integral c) => [(Coord c,TileIndex)] -> TileMap c
 tmFromList = tmFromGrid . gridFromList
 
 tmFilter :: (TileIndex -> Bool) -> TileMap c -> TileMap c
 tmFilter = tmOnGrid . gridFilter
 
-tmRows :: Integral c => TileMap c -> Maybe c
+tmRows :: Integral c => TileMap c -> c
 tmRows = gridRows . _tileMap
 
-tmCols :: Integral c => TileMap c -> Maybe c
+tmCols :: Integral c => TileMap c -> c
 tmCols = gridCols . _tileMap
 
 tmCoords :: Integral c => TileMap c -> [Coord c]
@@ -209,11 +207,11 @@ ppTileMap = ppGrid . tileMap
 -}
 
 csGenerateTileMap :: (Integral c) => (Coord c -> TileIndex)
-  -> Coords c -> Maybe (TileMap c)
+  -> Coords c -> TileMap c
 csGenerateTileMap f = tmFromGrid . gridMapKeysTo f
 
 csGenerateTileMapA :: (Applicative m, Integral c) =>
-  (Coord c -> m TileIndex) -> Coords c -> m (Maybe (TileMap c))
+  (Coord c -> m TileIndex) -> Coords c -> m (TileMap c)
 csGenerateTileMapA f = fmap tmFromGrid . gridTraverseKeys f
 
 -- }}}

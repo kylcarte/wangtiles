@@ -1,6 +1,8 @@
 
 module Tile.Neighborhood where
 
+import Data.Grid
+import Data.Points
 import Display
 import Tile
 import Util
@@ -96,18 +98,18 @@ wild = Nothing
 
 -- NeighborhoodConstraint {{{
 
-tmMatches :: NeighborhoodTileSet -> TileMap -> Coord
-  -> NeighborhoodTileSet
+tmMatches :: (Integral c) => NeighborhoodTileSet
+  -> TileMap c -> Coord c -> NeighborhoodTileSet
 tmMatches ts tm c = matchingNeighborhoods ts $ tmNeighborhood tm c
 
 matchingNeighborhoods :: NeighborhoodTileSet
   -> Neighborhood -> NeighborhoodTileSet
 matchingNeighborhoods ts n = tsFilter ((n ==) . snd) ts
 
-tmNeighborhood :: TileMap -> Coord -> Neighborhood
+tmNeighborhood :: (Integral c) => TileMap c -> Coord c -> Neighborhood
 tmNeighborhood tm = mkNeighborhood . tmSurrounding tm
 
-mkNeighborhood :: Eq a => Surrounding a -> Neighborhood
+mkNeighborhood :: (Eq a) => Surrounding a -> Neighborhood
 mkNeighborhood s = Neighborhood
   { nNW = (center ==) <$> corner sNW sN sW
   , nN  = (center ==) <$> edge   sN
@@ -197,17 +199,20 @@ mkNeighborhoods = tsMap relax . tsFromList . zip [0..]
 
 type NeighborhoodTextureSet = TextureSet Neighborhood
 
-neighborhoodTileMapByIndex :: NeighborhoodTextureSet -> TileIndex
-  -> TileMap -> Either Coord TileMap
+neighborhoodTileMapByIndex :: (Ord c, Integral c) =>
+  NeighborhoodTextureSet -> TileIndex
+  -> TileMap c -> Either (Coord c) (TileMap c)
 neighborhoodTileMapByIndex ts ti tm = neighborhoodTileMap ts tm $ tmSubMapByValue ti tm
 
-neighborhoodTileMap :: NeighborhoodTextureSet -> TileMap -> Coords -> Either Coord TileMap
+neighborhoodTileMap :: (Integral c) =>
+  NeighborhoodTextureSet -> TileMap c
+  -> Coords c -> Either (Coord c) (TileMap c)
 neighborhoodTileMap ts tm = csGenerateTileMapA fn
   where
   fn c = maybe (Left c) return $ tmMatch (textureSet ts) tm c
 
-tmMatch :: NeighborhoodTileSet -> TileMap -> Coord
-  -> Maybe TileIndex
+tmMatch :: (Integral c) => NeighborhoodTileSet
+  -> TileMap c -> Coord c -> Maybe TileIndex
 tmMatch ts tm c = fmap fst $ tsGetSingle $ tmMatches ts tm c
 
 -- }}}

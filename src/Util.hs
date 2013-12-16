@@ -220,3 +220,30 @@ underPrism pr f = preview pr . f . review pr
 
 -- }}}
 
+-- List selection {{{
+
+deleteGridIndices :: [(Int,Int)] -> [[a]] -> [[a]]
+deleteGridIndices is rs =
+  [ deleteIndices (I.lookup i im) r
+  | (r,i) <- zip rs [0..]
+  ]
+  where
+  im = groupIndices is
+
+groupIndices :: [(Int,Int)] -> I.IntMap [Int]
+groupIndices = foldr f I.empty
+  where
+  f (x,y) = I.alter (g y) x
+  g y Nothing   = Just [y]
+  g y (Just ys) = Just $ y:ys
+
+deleteIndices :: Maybe [Int] -> [a] -> [a]
+deleteIndices Nothing   as = as
+deleteIndices (Just is) as =
+  [ a
+  | (a,i) <- zip as [0..]
+  , i `notElem` is
+  ]
+
+-- }}}
+

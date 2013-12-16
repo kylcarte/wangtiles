@@ -30,7 +30,7 @@ library
                        Config.TileSet
                        Config.TileSet.Neighborhood
                        Config.TileSet.Wang
-                       Poisson
+                       -- Poisson
                        Texture
                        Util
   -- other-modules:       
