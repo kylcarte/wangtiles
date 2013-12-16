@@ -48,7 +48,7 @@ main = do
   rtm <- io' $ randomTileMap (0,1) sz
   tm1 <- io' $ neighborhoodTileMapByIndex blob  0 rtm
   tm2 <- io' $ neighborhoodTileMapByIndex fence 1 rtm
-  displayLayers rc (_tmSize rtm) (textureSize blob)
+  displayLayers rc sz (textureSize blob)
     $ map (uncurry $ renderTileMap rc) [(blob,tm1),(fence,tm2)]
 
   -- grass <- loadWangTextureSet wrc tss "grass" wangTiles2x2

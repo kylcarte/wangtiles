@@ -107,9 +107,8 @@ gridSurrounding g c = Surrounding
 
 -- TileMap {{{
 
-data TileMap c = TileMap
-  { _tmSize  :: Size c
-  , _tileMap :: Grid c TileIndex
+newtype TileMap c = TileMap
+  { _tileMap :: Grid c TileIndex
   } deriving (Eq,Show)
 
 makeLenses ''TileMap
@@ -118,17 +117,14 @@ tmSurrounding :: (Integral c) => TileMap c -> Coord c -> Surrounding TileIndex
 tmSurrounding = gridSurrounding . _tileMap
 
 tmFromGrid :: (Integral c) => Grid c TileIndex -> TileMap c
-tmFromGrid g = TileMap
-  { _tmSize  = gridSize g
-  , _tileMap = g
-  }
+tmFromGrid = TileMap
 
 tmOnGrid :: (Grid c TileIndex -> Grid c TileIndex) -> TileMap c -> TileMap c
 tmOnGrid f = tileMap %~ f
 
 tmOnGridA :: (Applicative f) => (Grid c TileIndex -> f (Grid c TileIndex))
   -> TileMap c -> f (TileMap c)
-tmOnGridA f tm = TileMap (tm^.tmSize) <$> f (tm^.tileMap)
+tmOnGridA f tm = TileMap <$> f (tm^.tileMap)
 
 
 tmOnGridM :: (Monad m) => (Grid c TileIndex -> m (Grid c TileIndex))
@@ -199,12 +195,10 @@ tmTraverseKeys = tmOnGridA . gridTraverseKeys
 
 randomTileMap :: (Integral c) => (TileIndex,TileIndex)
   -> Size c -> Random (TileMap c)
-randomTileMap rng sz = fmap (TileMap sz) . mkRandomGrid rng $ sz
+randomTileMap rng sz = fmap TileMap . mkRandomGrid rng $ sz
 
-{-
-ppTileMap :: TileMap -> String
-ppTileMap = ppGrid . tileMap
--}
+ppTileMap :: (Integral c, Show c) => TileMap c -> String
+ppTileMap = ppGrid . _tileMap
 
 csGenerateTileMap :: (Integral c) => (Coord c -> TileIndex)
   -> Coords c -> TileMap c

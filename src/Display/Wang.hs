@@ -14,7 +14,7 @@ import Control.Applicative
 import Graphics.Gloss hiding (Color)
 
 displayWangTileMap :: (Enum c) =>
-  WangRenderConfig -> WangTextureSet -> TileMap c -> IO ()
+  WangRenderConfig -> WangTextureSet -> Size c -> TileMap c -> IO ()
 displayWangTileMap = displayTileMap . wRenderConfig
 
 mkWangTextureSet :: WangRenderConfig -> TileSetConfig

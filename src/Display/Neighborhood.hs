@@ -3,12 +3,13 @@ module Display.Neighborhood where
 
 import Config.Render
 import Config.TileSet
+import Data.Points
 import Display
 import Tile
 import Tile.Neighborhood
 
 displayNeighborhoodTileMap :: (Enum c) => RenderConfig
-  -> NeighborhoodTextureSet -> TileMap c -> IO ()
+  -> NeighborhoodTextureSet -> Size c -> TileMap c -> IO ()
 displayNeighborhoodTileMap = displayTileMap
 
 mkNeighborhoodTextureSet :: TileSetConfig

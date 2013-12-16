@@ -9,7 +9,6 @@ import Config.TileSet
 import Util
 
 import Control.Applicative
-import Control.Lens
 import qualified Graphics.Gloss as Gloss
 import Graphics.Gloss hiding (Color, scale)
 import Linear
@@ -72,9 +71,9 @@ displayLayers :: (Enum c, Real f, Enum f, Fractional f) =>
 displayLayers cfg gs ts = displayPicture cfg gs ts . pictures
 
 displayTileMap :: (Enum c) => RenderConfig
-  -> TextureSet a -> TileMap c -> IO ()
-displayTileMap cfg txs tm = displayPicture cfg
-  (tm^.tmSize)
+  -> TextureSet a -> Size c -> TileMap c -> IO ()
+displayTileMap cfg txs sz tm = displayPicture cfg
+  sz
   (textureSize txs)
   $ renderTileMap cfg txs tm
 

@@ -14,6 +14,7 @@ import Control.Applicative
 import Control.Arrow ((&&&))
 import Control.Lens
 import Control.Monad
+import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
@@ -45,7 +46,7 @@ gridSize :: (Integral c) => Grid c a -> Size c
 gridSize =
     uncurry (-)
   . over both Size
-  . (safeMinimum &&& safeMaximum)
+  . (safeMaximum &&& safeMinimum)
   . map (view coordV2)
   . M.keys
   . _grid
@@ -175,18 +176,16 @@ subMapByValue = M.filter . (==)
 
 -- }}}
 
-{-
-ppGrid :: Show a => Grid c a -> String
+ppGrid :: (Integral c, Show a) => Grid c a -> String
 ppGrid g = ppRows
   [ [ pad s
-    | c <- [0..width sz - 1]
+    | c <- [0..(sz^.width) - 1]
     , let s = fromMaybe " " $ fmap show $ gridLookup g $ mkCoord c r
     ]
-  | r <- [0..height sz - 1]
+  | r <- [0..(sz^.height) - 1]
   ]
   where
   sz = gridSize g
-  rdigits = logBase 10 `withFloat` width sz
+  rdigits = logBase 10 `withFloat` fromEnum (sz^.width)
   pad s = replicate (rdigits - length s) ' ' ++ s
--}
 
