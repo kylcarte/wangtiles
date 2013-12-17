@@ -10,6 +10,7 @@ import Data.TileMap
 import Data.TileSet
 import Config.Render
 import Config.TileSet
+import Texture
 import Util
 
 import Control.Applicative
@@ -22,16 +23,16 @@ import Linear
 
 -- Instantiate to 'Size Float' ?
 data TextureSet a = TextureSet
-  { textureSet    :: TileSet (Picture,a)
+  { textureSet    :: TileSet (Texture,a)
   , textureSize   :: Size Float
-  , renderTexture :: Picture -> a -> Picture
+  , renderTexture :: Texture -> a -> Picture
   }
 
-tileTexture :: TextureSet a -> TileIndex -> (Picture,a)
+tileTexture :: TextureSet a -> TileIndex -> (Texture,a)
 tileTexture ts = tsIndex (textureSet ts)
 
-mkTextureSet :: (Picture -> a -> Picture) -> TileSetConfig
-  -> TileSet Picture -> TileSet a -> TextureSet a
+mkTextureSet :: (Texture -> a -> Picture) -> TileSetConfig
+  -> TileSet Texture -> TileSet a -> TextureSet a
 mkTextureSet rndr cfg tp ts = fromMaybe err $ TextureSet
   <$> tsZipR tp ts
   <*> pure (toFloat <$> tileSize cfg)
@@ -65,7 +66,7 @@ displayPicture cfg gs ts =
   availRes :: Float
   availRes = toFloat res - (2 * screenBorder cfg)
   sc :: Float
-  sc = availRes / toV2 max sz
+  sc = availRes / foldV2 max sz
   scaleToWindow :: Picture -> Picture
   scaleToWindow = scaleV2 $ pure sc
   --
@@ -112,8 +113,8 @@ gridDimensions cfg gs ts = sz * ts + sp * (sz - 1)
   sp = pure $ toFloat $ tileSpacing cfg
 
 moveV2 :: V2 Float -> Picture -> Picture
-moveV2 = toV2 translate
+moveV2 = foldV2 translate
 
 scaleV2 :: V2 Float -> Picture -> Picture
-scaleV2 = toV2 scale
+scaleV2 = foldV2 scale
 

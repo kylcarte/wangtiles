@@ -16,7 +16,6 @@ import Data.Aeson
 import qualified Data.ByteString.Lazy as BS
 import Data.Bifunctor
 import Data.Function (on)
-import Data.List (intercalate)
 import qualified Data.IntMap as I
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
@@ -90,7 +89,7 @@ disp :: Show a => a -> IO ()
 disp = putStrLn . ppShow
 
 ppRows :: [[String]] -> String
-ppRows = intercalate "\n" . map unwords
+ppRows = unlines . map unwords
 
 -- }}}
 
@@ -111,7 +110,7 @@ float :: (Real f, Enum f, Fractional f, Enum c) => Prism' f c
 float = prism' toF toC
   where
   toF :: (Enum c, Fractional f) => c -> f
-  toF = fromRational.toEnum.fromEnum
+  toF = fromRational.enums
   toC :: (Enum c, Real f, Enum f) => f -> Maybe c
   toC r = if r == toEnum rt
     then Just $ toEnum rt
@@ -131,6 +130,9 @@ toFloat :: (Enum f, Fractional f, Real f, Enum c)
   => c -> f
 toFloat = review float
 
+enums :: (Enum a, Enum b) => a -> b
+enums = toEnum . fromEnum
+
 -- }}}
 
 -- Application combinators {{{
@@ -140,6 +142,9 @@ onlyIndex = flip . const
 
 uncurry4 :: (a -> b -> c -> d -> e) -> (a,b,c,d) -> e
 uncurry4 f (a,b,c,d) = f a b c d
+
+on4 :: (a -> b) -> (a,a,a,a) -> (b,b,b,b)
+on4 f (a,b,c,d) = (f a,f b,f c,f d)
 
 (.:.) :: (c -> d) -> (a -> b -> c) -> a -> b -> d
 (.:.) = (.) . (.)
@@ -172,8 +177,11 @@ swap (a,b) = (b,a)
 
 -- V2 {{{
 
-toV2 :: (c -> c -> b) -> V2 c -> b
-toV2 f c = f (c^._x) (c^._y)
+foldV2 :: (R2 f) => (c -> c -> b) -> f c -> b
+foldV2 f c = f (c^._x) (c^._y)
+
+onV2 :: (Additive f) => (a -> b -> c) -> f a -> f b -> f c
+onV2 = liftI2
 
 -- }}}
 

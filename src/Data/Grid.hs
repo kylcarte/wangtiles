@@ -3,6 +3,7 @@
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE PatternGuards #-}
 
 module Data.Grid where
 
@@ -14,6 +15,7 @@ import Control.Applicative
 import Control.Arrow ((&&&))
 import Control.Lens
 import Control.Monad
+import Data.List (maximumBy, minimumBy)
 import Data.Maybe (fromMaybe)
 import qualified Data.Map as M
 import qualified Data.Foldable as F
@@ -42,12 +44,12 @@ emptyGrid = gridFromMap M.empty
 mkRepeatGrid :: (Integral c) => Size c -> a -> Grid c a
 mkRepeatGrid sz a = gridFromList $ zip cs $ repeat a
   where
-  cs = enumCoords sz [0..lexMaxBound sz]
+  cs = allCoords sz
 
 mkIotaGrid :: (Enum a, Num a, Integral c) => Size c -> Grid c a
 mkIotaGrid sz = gridFromList $ zip cs [0..]
   where
-  cs = enumCoords sz [0..lexMaxBound sz]
+  cs = allCoords sz
 
 mkRandomGrid :: forall a c. (Integral c, R.Random a)
   => (a,a) -> Size c -> Random (Grid c a)
@@ -105,6 +107,19 @@ gridDifference = gridOnMap . M.difference . _grid
 gridMinimum, gridMaximum :: (Ord c) => Grid c a -> Maybe (Coord c, a)
 gridMinimum = fmap fst . M.minViewWithKey . _grid
 gridMaximum = fmap fst . M.maxViewWithKey . _grid
+
+gridMinimumValue, gridMaximumValue :: (Ord a, Ord c)
+  => Grid c a -> Maybe (Coord c, a)
+gridMinimumValue g
+  | cs <- gridContents g
+  = if null cs
+    then Nothing
+    else Just $ minimumBy (compare `on` snd) cs
+gridMaximumValue g
+  | cs <- gridContents g
+  = if null cs
+    then Nothing
+    else Just $ maximumBy (compare `on` snd) cs
 
 -- }}}
 
@@ -203,19 +218,20 @@ subMapByValue = M.filter . (==)
 
 -- Pretty Printing {{{
 
-ppGrid :: (Integral c, Show a, Enum a) => Grid c a -> String
+ppGrid :: (Ord a, Integral c, Show a, Enum a) => Grid c a -> String
 ppGrid g = ppRows
   [ [ pad s
     | c <- [0..(sz^.width) - 1]
-    , let s = fromMaybe " " $ fmap show $ gridLookup g $ mkCoord c r
+    , let s = fromMaybe "" $ fmap show $ gridLookup g $ mkCoord c r
     ]
   | r <- [0..(sz^.height) - 1]
   ]
   where
+  blnk = replicate mxdigits ' '
   sz = gridSize g
   mxdigits = length mx
   pad s = replicate (mxdigits - length s) ' ' ++ s
-  mx = maybe "" (show . snd) $ gridMaximum g
+  mx = maybe blnk (show . snd) $ gridMaximumValue g
 
 -- }}}
 

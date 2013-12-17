@@ -29,7 +29,7 @@ newtype Coord c = Coord
   { coord :: V2 c
   } deriving
     ( Eq, Show, Num, Fractional
-    , Epsilon, R1, R2
+    , Epsilon, R1, R2, Additive
     , Functor, Applicative, Monad
     , Foldable, Traversable
     )
@@ -101,10 +101,10 @@ onCoord = under $ from coordV2
 newtype Size c = Size
   { size :: V2 c
   } deriving
-    ( Eq , Ord , Show , Num , Fractional
-    , Epsilon , R1 , R2
-    , Functor , Applicative , Monad
-    , Foldable , Traversable
+    ( Eq, Ord, Show, Num, Fractional
+    , Epsilon, R1, R2, Additive
+    , Functor, Applicative, Monad
+    , Foldable, Traversable
     )
 
 mkSize :: c -> c -> Size c
@@ -172,6 +172,21 @@ coordInt sz = prism' toInt fromInt
 coordOnInt :: (Integral c) => Size c -> (Int -> Int)
   -> Coord c -> Maybe (Coord c)
 coordOnInt sz = underPrism $ coordInt sz
+
+allCoords :: (Integral c) => Size c -> [Coord c]
+allCoords sz = enumCoords sz [0..lexMaxBound sz]
+
+coordGrid :: (Integral c) => Size c -> Maybe (Size c) -> [[Coord c]]
+coordGrid sz mt =
+  [ [ mkCoord x y
+    | x <- xs $ view width <$> mt
+    ]
+  | y <- ys $ view height <$> mt
+  ]
+  where
+  (w,h) = view widthHeight $ sz - 1
+  xs = maybe [0..w] $ \tw -> [0,tw..w]
+  ys = maybe [0..h] $ \th -> [0,th..h]
 
 enumCoords :: (Integral c) => Size c -> [Int] -> [Coord c]
 enumCoords = mapMaybe . indexCoord

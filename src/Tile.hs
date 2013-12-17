@@ -52,7 +52,7 @@ infixr 4 :.:
 
 neighTM :: TileMap Int
 neighTM = tmFromList $ zip
-  (enumCoords sz' [0..lexMaxBound sz'] \\
+  (allCoords sz' \\
     [ mkCoord 0 3
     , mkCoord 0 4
     , mkCoord 1 4

@@ -8,52 +8,55 @@ import Data.Points
 import Data.TileSet
 import Util
 
-import Control.Arrow ((&&&))
+import Control.Applicative
 import Control.Lens
-import Data.Maybe (catMaybes)
+import Data.Word (Word8)
 import qualified Data.Map as M
 import qualified Data.Traversable as T
 import Codec.Picture
-import Graphics.Gloss
+import Graphics.Gloss.Data.Picture
 import Graphics.Gloss.Juicy
 
-loadTextureMap :: TileSetConfig -> IO (TileSet Picture)
-loadTextureMap cfg = readImage (textureFile cfg) >>= splitAndRender
+type Texture = Image PixelRGBA8
+
+loadTextureMap :: TileSetConfig -> IO (TileSet Texture)
+loadTextureMap cfg = splitAndRender <$> loadTexture (textureFile cfg)
   where
-  splitAndRender = either fail $ return
-    . tsFromList
+  splitAndRender = 
+      tsFromList
     . flattenAndIndex
-    . map (map fromDynamicImage)
     . deleteGridIndices
         (map (view colRow) $ ignoreTiles cfg)
     . splitImage (tileSize cfg)
-  flattenAndIndex :: [[Maybe a]] -> [(Int,a)]
-  flattenAndIndex = zip [0..] . catMaybes . concat
+  flattenAndIndex :: [[a]] -> [(Int,a)]
+  flattenAndIndex = zip [0..] . concat
 
-mkTextureMap :: (Ord c) => M.Map (Coord c) Picture
-  -> TileSet (Coord c) -> Maybe (TileSet Picture)
+loadTexture :: FilePath -> IO Texture
+loadTexture f = do
+  ei <- readImage f
+  img <- either fail return ei
+  case img of
+    ImageRGBA8 i -> return i
+    _ -> fail $ "Image format is currently unsupported: " ++
+           dynamicImageVariety img
+
+mkTextureMap :: (Ord c) => M.Map (Coord c) Texture
+  -> TileSet (Coord c) -> Maybe (TileSet Texture)
 mkTextureMap = T.traverse . flip M.lookup
 
-splitImage :: (Show c, Integral c) => Size c -> DynamicImage -> [[DynamicImage]]
+splitImage :: Size Int -> Texture -> [[Texture]]
 splitImage ts img
-  | 0 <- imgX `mod` tileX
-  , 0 <- imgY `mod` tileY
-  = [ [ subImage (mkCoord x y) ts img
-      | x <- [0,tileX..(imgX - 1)]
-      ]
-    | y <- [0,tileY..(imgY - 1)]
-    ]
+  | 0 <- onV2 mod imgSize ts
+  = map (map $ subImage ts img)
+    $ coordGrid imgSize (Just ts)
   | otherwise = error $
-      "Texture of size " ++
-      show imgX ++ "x" ++ show imgY ++
-      " does not fit tiles of size " ++
-      show tileX ++ "x" ++ show tileY
+      "Texture of size " ++ show imgSize ++
+      " does not fit tiles of size " ++ show ts
   where
-  (tileX,tileY) = view widthHeight ts
-  (imgX,imgY)   = over both toEnum $ diWidthHeight img
+  imgSize       = dynamicImageSize img
 
-subImage :: (Enum c) => Coord c -> Size c -> DynamicImage -> DynamicImage
-subImage cd sz = mapDynamicImage $ mkSubImage cd sz
+subImage :: (Enum c) => Size c -> Texture -> Coord c -> Texture
+subImage sz img cd = mkSubImage cd sz img
 
 mkSubImage :: (Enum c, Pixel a) => Coord c -> Size c -> Image a -> Image a
 mkSubImage cd sz i =
@@ -68,45 +71,57 @@ mkSubImage cd sz i =
 pixelFromCoord :: Pixel a => Image a -> Coord Int -> Int -> Int -> a
 pixelFromCoord i cd = fromCoord $ toCoord (pixelAt i) . (cd +)
 
--- DynamicImage {{{
+-- Texture {{{
 
--- ugh
-onDynamicImage :: (forall a. Pixel a => Image a -> b)
-  -> DynamicImage -> b
-onDynamicImage f img = case img of
-  ImageY8     i -> f i
-  ImageY16    i -> f i
-  ImageYF     i -> f i
-  ImageYA8    i -> f i
-  ImageYA16   i -> f i
-  ImageRGB8   i -> f i
-  ImageRGB16  i -> f i
-  ImageRGBF   i -> f i
-  ImageRGBA8  i -> f i
-  ImageRGBA16 i -> f i
-  ImageYCbCr8 i -> f i
-  ImageCMYK8  i -> f i
-  ImageCMYK16 i -> f i
+dynamicImageVariety :: DynamicImage -> String
+dynamicImageVariety img = case img of
+  ImageY8     _ -> "ImageY8"
+  ImageY16    _ -> "ImageY16"
+  ImageYF     _ -> "ImageYF"
+  ImageYA8    _ -> "ImageYA8"
+  ImageYA16   _ -> "ImageYA16"
+  ImageRGB8   _ -> "ImageRGB8"
+  ImageRGB16  _ -> "ImageRGB16"
+  ImageRGBF   _ -> "ImageRGBF"
+  ImageRGBA8  _ -> "ImageRGBA8"
+  ImageRGBA16 _ -> "ImageRGBA16"
+  ImageYCbCr8 _ -> "ImageYCbCr8"
+  ImageCMYK8  _ -> "ImageCMYK8"
+  ImageCMYK16 _ -> "ImageCMYK16"
 
-mapDynamicImage :: (forall a. Pixel a => Image a -> Image a)
-  -> DynamicImage -> DynamicImage
-mapDynamicImage f img = case img of
-  ImageY8     i -> ImageY8     $ f i
-  ImageY16    i -> ImageY16    $ f i
-  ImageYF     i -> ImageYF     $ f i
-  ImageYA8    i -> ImageYA8    $ f i
-  ImageYA16   i -> ImageYA16   $ f i
-  ImageRGB8   i -> ImageRGB8   $ f i
-  ImageRGB16  i -> ImageRGB16  $ f i
-  ImageRGBF   i -> ImageRGBF   $ f i
-  ImageRGBA8  i -> ImageRGBA8  $ f i
-  ImageRGBA16 i -> ImageRGBA16 $ f i
-  ImageYCbCr8 i -> ImageYCbCr8 $ f i
-  ImageCMYK8  i -> ImageCMYK8  $ f i
-  ImageCMYK16 i -> ImageCMYK16 $ f i
+type RGBA = (Word8,Word8,Word8,Word8)
 
-diWidthHeight :: DynamicImage -> (Int,Int)
-diWidthHeight = onDynamicImage imageWidth &&& onDynamicImage imageHeight
+dynamicImageSize :: Texture -> Size Int
+dynamicImageSize img = mkSize (imageWidth img) (imageHeight img)
+
+solidColor :: Pixel a => Size Int -> a -> Image a
+solidColor sz c = foldV2 (generateImage $ \_x _y -> c) sz
+
+solidRGBA8 :: Size Int -> RGBA -> Texture
+solidRGBA8 sz = solidColor sz . mkRGBA8
+
+shadeImage :: Rational -> RGBA -> Image PixelRGBA8 -> Image PixelRGBA8
+shadeImage rat c = pixelMap $ \c2 -> mixColors rat c1 c2
+  where
+  c1 = mkRGBA8 c
+
+rgba8 :: PixelRGBA8 -> RGBA
+rgba8 (PixelRGBA8 r g b a) = (r,g,b,a)
+
+mkRGBA8 :: RGBA -> PixelRGBA8
+mkRGBA8 = uncurry4 PixelRGBA8
+
+mixColors :: Rational -> PixelRGBA8 -> PixelRGBA8 -> PixelRGBA8
+mixColors rat c1 c2 = PixelRGBA8
+  (enums $ rat * r1 + inv * r2)
+  (enums $ rat * g1 + inv * g2)
+  (enums $ rat * b1 + inv * b2)
+  (enums $ rat * a1 + inv * a2)
+  where
+  (r1,g1,b1,a1) = on4 toRational $ rgba8 c1
+  (r2,g2,b2,a2) = on4 toRational $ rgba8 c2
+  inv           = 1 - rat
+
 
 -- }}}
 

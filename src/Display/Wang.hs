@@ -8,26 +8,28 @@ import Data.Points
 import Data.TileMap
 import Data.TileSet
 import Display
+import Texture
 import Tile.Wang
 import Util
 
 import Control.Applicative
+import Graphics.Gloss.Juicy
 
 displayWangTileMap :: (Enum c) => WangRenderConfig
   -> WangTextureSet -> Size c -> TileMap c -> IO ()
 displayWangTileMap = displayTileMap . wRenderConfig
 
 mkWangTextureSet :: WangRenderConfig -> TileSetConfig
-  -> TileSet Picture -> WangTileSet -> WangTextureSet
+  -> TileSet Texture -> WangTileSet -> WangTextureSet
 mkWangTextureSet cfg tsc = mkTextureSet (renderWangTile cfg rsz) tsc
   where
   rsz = toFloat <$> tileSize tsc
 
 renderWangTile :: WangRenderConfig -> Size Float
-  -> Picture -> Wang -> Picture
+  -> Texture -> Wang -> Picture
 renderWangTile cfg rsz p t = pictures
-  [ if wRenderEdges      cfg  then es else blank
-  , if tileRenderTexture cfg' then p  else blank
+  [ if wRenderEdges      cfg  then               es else blank
+  , if tileRenderTexture cfg' then fromImageRGBA8 p else blank
   ]
   where
   cfg' = wRenderConfig cfg

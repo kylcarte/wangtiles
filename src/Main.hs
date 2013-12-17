@@ -7,6 +7,7 @@ import Config.TileSet.Neighborhood
 import Config.TileSet.Wang
 import Data.Grid
 import Data.Points
+import Data.Surrounding
 import Data.TileMap
 import Display
 import Display.Neighborhood
@@ -18,6 +19,7 @@ import Tile.Neighborhood
 import Tile.Wang
 import Util
 
+import Control.Monad
 import Data.List ((\\))
 import qualified Data.Text as T
 import System.Environment
@@ -46,15 +48,12 @@ main :: IO ()
 main = do
   mapFile <- parseArgs
   tss <- loadTileSets "data/tilesets.conf"
-  blob  <- loadNeighborhoodTextureSet tss "blob"  neighborhood8
+  blob  <- loadNeighborhoodTextureSet tss "blob-grey" neighborhood8
 
   (tm,ts) <- readRoom mapFile
-  printTileMap tm
+  printTileMap (tm :: TileMap Int)
   ntm <- io' $ neighborhoodTileMapByIndex blob 0 tm
-  putStrLn ""
   printTileMap ntm
-  putStrLn ""
-  printTileMap neighTM
   displayTileMap rc blob (tmSize tm) ntm
   -- displayTileMap rc blob (tmSize neighTM) neighTM
 
