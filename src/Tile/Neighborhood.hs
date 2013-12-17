@@ -1,8 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Tile.Neighborhood
   ( Neighborhood (..)
@@ -13,7 +8,7 @@ module Tile.Neighborhood
   , NeighborhoodTileSet
   , NeighborhoodTextureSet
   , ppNP
-  , mkNeighborhoodPicture
+  -- , mkNeighborhoodPicture
   ) where
 
 import Data.Grid
@@ -22,28 +17,29 @@ import Data.Surrounding
 import Data.TileMap
 import Data.TileSet
 import Display
-import Render
-import Tile
 import Util
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Reader
 import Data.List  (transpose)
 import Data.Maybe (fromMaybe)
 
+{-
 instance TileLogic Neighborhood where
   type HasTileSets Neighborhood tss = HasTileSet Neighborhood tss
-  type Params Neighborhood = TileIndex
+  type Index Neighborhood = TileIndex
+  type Params Neighborhood = Texture
+-}
 
 type NeighborhoodTileSet = TileSet Neighborhood
 
+{-
 -- Render {{{
 
 instance (MonadReader Textures m) => RenderTile m Neighborhood where
   mkPictureProxy _ i = do
     ts <- ask
-    return $ tsIndex ts i
+    return $ fromImageRGBA8 $ tsIndex ts i
 
 neighborhoodProxy :: Proxy Neighborhood
 neighborhoodProxy = Proxy
@@ -52,6 +48,7 @@ mkNeighborhoodPicture :: (MonadReader Textures m) => TileIndex -> m Picture
 mkNeighborhoodPicture = mkPictureProxy neighborhoodProxy
 
 -- }}}
+-}
 
 -- Neighborhoods {{{
 

@@ -257,3 +257,9 @@ deleteIndices (Just is) as =
 
 -- }}}
 
+-- Proxy {{{
+
+data Proxy a = Proxy
+
+-- }}}
+

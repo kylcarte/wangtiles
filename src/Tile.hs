@@ -1,41 +1,31 @@
-{-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE DataKinds #-}
-{-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE DefaultSignatures #-}
 
 module Tile where
 
 import Data.Points
 import Data.TileMap
-import Data.TileSet
-import Util
 
-import Control.Applicative
 import Data.List ((\\))
-import GHC.Exts (Constraint)
 
+{-
 -- TileLogic / HasTileSet machinery {{{
 
 class TileLogic t where
   type HasTileSets t tss :: Constraint
+  type Index t
   type Params t
   lookupTile :: HasTileSets t tss => 
-    tss -> Params t -> Maybe t
+    tss -> Index t -> Maybe t
   default lookupTile ::
-       (Params t ~ TileIndex, HasTileSet t tss)
+       (Index t ~ TileIndex, HasTileSet t tss)
     => tss -> TileIndex -> Maybe t
   lookupTile tss i = tsLookup (getTileSet tss) i
 
-instance (Params t ~ TileIndex, TileLogic t, TileLogic u)
+instance (Index t ~ TileIndex, TileLogic t, TileLogic u)
   => TileLogic (t :.: u) where
   type HasTileSets (t :.: u) tss =
     (HasTileSet t tss,HasTileSets u tss)
-  type Params (t :.: u) = Params t :.: Params u
+  type Index (t :.: u) = Index t :.: Index u
+  type Params (t :.: u) = Index t :.: Index u
   lookupTile tss (pt :.: pu) = (:.:)
     <$> ((`tsLookup` pt) $ getTileSet tss)
     <*> (lookupTile tss pu)
@@ -47,6 +37,7 @@ data a :.: b = a :.: b deriving (Eq,Show)
 infixr 4 :.:
 
 -- }}}
+-}
 
 -- Examples {{{
 

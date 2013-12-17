@@ -20,7 +20,6 @@ library
                        Tile.Wang
                        Tile.Legend
                        Tile.Neighborhood
-                       Tile.NWL
                        Data.Grid
                        Data.Points
                        Data.Surrounding
@@ -38,6 +37,10 @@ library
                        Config.TileSet.Wang
                        -- Poisson
                        Render
+                       Render.Legend
+                       Render.Neighborhood
+                       Render.Wang
+                       Render.WL
                        Texture
                        Util
   -- other-modules:       

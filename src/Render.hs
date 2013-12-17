@@ -1,21 +1,23 @@
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Render
   ( module Render
   , module Graphics.Gloss.Data.Picture
+  , fromImageRGBA8
   ) where
 
+import Data.Points
+import Data.TileMaps
 import Data.TileSet
-import Tile
+import Texture
 
 import Graphics.Gloss.Data.Picture
+import Graphics.Gloss.Juicy
 
-data Proxy a = Proxy
+class RenderTile p where
+  type RenderData p
+  buildRender   :: (Ord c) => TileMaps c -> Coord c -> Maybe p
+  renderPicture :: RenderData p -> p -> Picture
 
-class (TileLogic t, Monad m) => RenderTile m t where
-  mkPictureProxy :: Proxy t -> Params t -> m Picture
-
-type Textures = TileSet Picture
+type Textures = TileSet Texture
 

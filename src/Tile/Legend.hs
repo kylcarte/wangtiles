@@ -1,10 +1,4 @@
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE PatternGuards #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module Tile.Legend
   ( printRoom
@@ -13,19 +7,16 @@ module Tile.Legend
   , LegendSet
   , mkLegend
   , Legend (..)
-  , mkLegendPicture
+  -- , mkLegendPicture
   ) where
 
 import Data.Points
 import Data.TileMap
 import Data.TileSet
-import Render
-import Tile
 import Util
 
 import Control.Applicative
 import Control.Arrow (second)
-import Control.Monad.Reader
 import Data.Text (Text)
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
@@ -33,9 +24,12 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
+{-
 instance TileLogic Legend where
   type HasTileSets Legend tss = HasTileSet Legend tss
-  type Params Legend = TileIndex
+  type Index Legend = TileIndex
+  type Params Legend = Texture
+-}
 
 newtype Legend = Legend
   { legend :: Text
@@ -47,12 +41,13 @@ mkLegend = Legend
 type Room = TileMap
 type LegendSet = TileSet Legend
 
+{-
 -- Render {{{
 
 instance (MonadReader Textures m) => RenderTile m Legend where
   mkPictureProxy _ i = do
     ts <- ask
-    return $ tsIndex ts i
+    return $ fromImageRGBA8 $ tsIndex ts i
 
 legendProxy :: Proxy Legend
 legendProxy = Proxy
@@ -61,6 +56,7 @@ mkLegendPicture :: (MonadReader Textures m) => TileIndex -> m Picture
 mkLegendPicture = mkPictureProxy legendProxy
 
 -- }}}
+-}
 
 -- Parsing {{{
 

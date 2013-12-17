@@ -1,8 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 
 module Tile.Wang
   ( Wang (..)
@@ -14,7 +9,7 @@ module Tile.Wang
   , WangTextureSet
   , wangTileMap
   , wangTileMapByIndex
-  , mkWangPicture
+  -- , mkWangPicture
   , tileColors
   , edgeAxis
   , glossColor
@@ -27,37 +22,15 @@ import Data.Points
 import Data.TileMap
 import Data.TileSet
 import Display
-import Render
-import Tile
 import Util
 
 import Control.Applicative
 import Control.Lens
-import Control.Monad.Reader
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Graphics.Gloss.Data.Color as Gloss
 
-instance TileLogic Wang where
-  type HasTileSets Wang tss = HasTileSet Wang tss
-  type Params Wang = TileIndex
-
 type WangTileSet = TileSet Wang
-
--- Render {{{
-
-instance (MonadReader Textures m) => RenderTile m Wang where
-  mkPictureProxy _ i = do
-    ts <- ask
-    return $ tsIndex ts i
-
-wangProxy :: Proxy Wang
-wangProxy = Proxy
-
-mkWangPicture :: (MonadReader Textures m) => TileIndex -> m Picture
-mkWangPicture = mkPictureProxy wangProxy
-
--- }}}
 
 -- Tiles {{{
 

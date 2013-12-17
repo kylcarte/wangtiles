@@ -14,8 +14,6 @@ import Data.Word (Word8)
 import qualified Data.Map as M
 import qualified Data.Traversable as T
 import Codec.Picture
-import Graphics.Gloss.Data.Picture
-import Graphics.Gloss.Juicy
 
 type Texture = Image PixelRGBA8
 
