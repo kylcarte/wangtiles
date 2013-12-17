@@ -6,6 +6,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DefaultSignatures #-}
 
 module Tile where
 
@@ -18,33 +19,36 @@ import Control.Applicative
 import Data.List ((\\))
 import GHC.Exts (Constraint)
 
-data a :.: b = a :.: b deriving (Eq,Show)
-
-infixr 4 :.:
-
-traverseBoth :: (Applicative f) =>
-  (a -> f c) -> (b -> f d) -> a :.: b -> f (c :.: d)
-traverseBoth f g (a :.: b) = (:.:) <$> f a <*> g b
-
-
+-- TileLogic / HasTileSet machinery {{{
 
 class TileLogic t where
   type HasTileSets t tss :: Constraint
   type Params t
   lookupTile :: HasTileSets t tss => 
-    Params t -> tss -> Maybe t
+    tss -> Params t -> Maybe t
+  default lookupTile ::
+       (Params t ~ TileIndex, HasTileSet t tss)
+    => tss -> TileIndex -> Maybe t
+  lookupTile tss i = tsLookup (getTileSet tss) i
 
-instance (Params t ~ TileIndex, TileLogic t, TileLogic u) => TileLogic (t :.: u) where
-  type HasTileSets (t :.: u) tss = (HasTileSet t tss,HasTileSets u tss)
+instance (Params t ~ TileIndex, TileLogic t, TileLogic u)
+  => TileLogic (t :.: u) where
+  type HasTileSets (t :.: u) tss =
+    (HasTileSet t tss,HasTileSets u tss)
   type Params (t :.: u) = Params t :.: Params u
-  lookupTile (pt :.: pu) tss = (:.:)
+  lookupTile tss (pt :.: pu) = (:.:)
     <$> ((`tsLookup` pt) $ getTileSet tss)
-    <*> (lookupTile pu tss)
+    <*> (lookupTile tss pu)
 
 class HasTileSet t tss where
   getTileSet :: tss -> TileSet t
 
+data a :.: b = a :.: b deriving (Eq,Show)
+infixr 4 :.:
 
+-- }}}
+
+-- Examples {{{
 
 neighTM :: TileMap Int
 neighTM = tmFromList $ zip
@@ -56,4 +60,6 @@ neighTM = tmFromList $ zip
   [0..]
   where
   sz' = mkSize 10 5
+
+-- }}}
 

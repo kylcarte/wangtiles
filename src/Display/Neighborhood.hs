@@ -4,6 +4,7 @@ module Display.Neighborhood where
 import Config.Render
 import Config.TileSet
 import Data.TileMap
+import Data.TileSet
 import Data.Points
 import Display
 import Tile.Neighborhood
@@ -13,6 +14,6 @@ displayNeighborhoodTileMap :: (Enum c) => RenderConfig
 displayNeighborhoodTileMap = displayTileMap
 
 mkNeighborhoodTextureSet :: TileSetConfig
-  -> NeighborhoodTileSet -> NeighborhoodTextureSet
+  -> TileSet Picture -> NeighborhoodTileSet -> NeighborhoodTextureSet
 mkNeighborhoodTextureSet = mkTextureSet const
 

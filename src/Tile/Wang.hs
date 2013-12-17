@@ -1,6 +1,25 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
-module Tile.Wang where
+module Tile.Wang
+  ( Wang (..)
+  , Edge (..)
+  , Color (..)
+  , wangTiles2x2
+  , wangTiles2x3
+  , WangTileSet
+  , WangTextureSet
+  , wangTileMap
+  , wangTileMapByIndex
+  , mkWangPicture
+  , tileColors
+  , edgeAxis
+  , glossColor
+  , ppWT
+  ) where
 
 import Control.Monad.Trans.Random
 import Data.Grid
@@ -8,10 +27,13 @@ import Data.Points
 import Data.TileMap
 import Data.TileSet
 import Display
+import Render
 import Tile
 import Util
 
+import Control.Applicative
 import Control.Lens
+import Control.Monad.Reader
 import qualified Data.Set as S
 import qualified Data.Map as M
 import qualified Graphics.Gloss.Data.Color as Gloss
@@ -19,7 +41,23 @@ import qualified Graphics.Gloss.Data.Color as Gloss
 instance TileLogic Wang where
   type HasTileSets Wang tss = HasTileSet Wang tss
   type Params Wang = TileIndex
-  lookupTile i tss = tsLookup (getTileSet tss) i
+
+type WangTileSet = TileSet Wang
+
+-- Render {{{
+
+instance (MonadReader Textures m) => RenderTile m Wang where
+  mkPictureProxy _ i = do
+    ts <- ask
+    return $ tsIndex ts i
+
+wangProxy :: Proxy Wang
+wangProxy = Proxy
+
+mkWangPicture :: (MonadReader Textures m) => TileIndex -> m Picture
+mkWangPicture = mkPictureProxy wangProxy
+
+-- }}}
 
 -- Tiles {{{
 
@@ -128,23 +166,6 @@ selectTiles cs = tsFilter $ satisfies cs
 
 -- }}}
 
--- WangTileSet {{{
-
-class HasWangTileSet tss where
-  wangTileSet :: tss -> WangTileSet
-
-type WangTileSet = TileSet Wang
-
-wangTileAt :: WangTileSet -> TileIndex -> Wang
-wangTileAt ts i = wangTexture ts i
-
-wangTexture :: WangTileSet -> TileIndex -> Wang
-wangTexture = tsIndex
-
-
-
--- }}}
-
 -- TileMap {{{
 
 type WangTextureSet = TextureSet Wang
@@ -156,11 +177,11 @@ wangTileMapByIndex ts ti tm = wangTileMapAt ts tm $ tmSubMapByValue ti tm
 -- Wang-tile the contents of the TileMap.
 wangTileMapAt :: (Integral c) => WangTextureSet -> TileMap c
   -> Coords c -> Random (TileMap c)
-wangTileMapAt ts tm = csGenerateTileMapA $ randomWangTile (textureSet ts) tm
+wangTileMapAt ts tm = csGenerateTileMapA $ randomWangTile (snd <$> textureSet ts) tm
 
 wangTileMap :: (Num c, Ord c) => WangTextureSet
   -> TileMap c -> Random (TileMap c)
-wangTileMap ts tm = tmTraverseKeys (randomWangTile (textureSet ts) tm) tm
+wangTileMap ts tm = tmTraverseKeys (randomWangTile (snd <$> textureSet ts) tm) tm
 
 -- TODO: generalize. how do we capture which tiles have already been
 --   handled?
@@ -178,7 +199,7 @@ randomWangTile ts tm cd = tsRandomIndex suitable
          [ if cd^.col == 0 then [] else [ ( West  , edgeColorAt left  East  ) ]
          , if cd^.row == 0 then [] else [ ( North , edgeColorAt above South ) ]
          ]
-  edgeColorAt c e = edgeColor e . wangTileAt ts . flip tmIndex c $ tm
+  edgeColorAt c e = edgeColor e . tsIndex ts . flip tmIndex c $ tm
 
 -- }}}
 

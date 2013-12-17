@@ -1,6 +1,20 @@
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 
-module Tile.Neighborhood where
+module Tile.Neighborhood
+  ( Neighborhood (..)
+  , neighborhood4
+  , neighborhood8
+  , neighborhoodTileMap
+  , neighborhoodTileMapByIndex
+  , NeighborhoodTileSet
+  , NeighborhoodTextureSet
+  , ppNP
+  , mkNeighborhoodPicture
+  ) where
 
 import Data.Grid
 import Data.Points
@@ -8,18 +22,36 @@ import Data.Surrounding
 import Data.TileMap
 import Data.TileSet
 import Display
+import Render
 import Tile
 import Util
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Reader
 import Data.List  (transpose)
 import Data.Maybe (fromMaybe)
 
 instance TileLogic Neighborhood where
   type HasTileSets Neighborhood tss = HasTileSet Neighborhood tss
   type Params Neighborhood = TileIndex
-  lookupTile i tss = tsLookup (getTileSet tss) i
+
+type NeighborhoodTileSet = TileSet Neighborhood
+
+-- Render {{{
+
+instance (MonadReader Textures m) => RenderTile m Neighborhood where
+  mkPictureProxy _ i = do
+    ts <- ask
+    return $ tsIndex ts i
+
+neighborhoodProxy :: Proxy Neighborhood
+neighborhoodProxy = Proxy
+
+mkNeighborhoodPicture :: (MonadReader Textures m) => TileIndex -> m Picture
+mkNeighborhoodPicture = mkPictureProxy neighborhoodProxy
+
+-- }}}
 
 -- Neighborhoods {{{
 
@@ -134,22 +166,6 @@ mkNeighborhood s = Neighborhood
 
 -- }}}
 
--- NeighborhoodTileSet {{{
-
-class HasNeighborhoodTileSet tss where
-  neighborhoodTileSet :: tss -> NeighborhoodTileSet
-
-type NeighborhoodTileSet = TileSet Neighborhood
-
-neighborhoodAt :: NeighborhoodTileSet -> TileIndex -> Neighborhood
-neighborhoodAt ts i = neighborhoodTexture ts i
-
-neighborhoodTexture :: NeighborhoodTileSet -> TileIndex
-  -> Neighborhood
-neighborhoodTexture = tsIndex
-
--- }}}
-
 -- Decode {{{
 
 type EncodedNeighborhoods = [[[String]]]
@@ -209,17 +225,17 @@ mkNeighborhoods = tsMap relax . tsFromList . zip [0..]
 
 type NeighborhoodTextureSet = TextureSet Neighborhood
 
-neighborhoodTileMapByIndex :: (Ord c, Integral c) =>
-  NeighborhoodTextureSet -> TileIndex
+neighborhoodTileMapByIndex :: (Ord c, Integral c)
+  => NeighborhoodTextureSet -> TileIndex
   -> TileMap c -> Either (Coord c) (TileMap c)
 neighborhoodTileMapByIndex ts ti tm = neighborhoodTileMap ts tm $ tmSubMapByValue ti tm
 
-neighborhoodTileMap :: (Integral c) =>
-  NeighborhoodTextureSet -> TileMap c
+neighborhoodTileMap :: (Integral c)
+  => NeighborhoodTextureSet -> TileMap c
   -> Coords c -> Either (Coord c) (TileMap c)
 neighborhoodTileMap ts tm = csGenerateTileMapA fn
   where
-  fn c = maybe (Left c) return $ tmMatch (textureSet ts) tm c
+  fn c = maybe (Left c) return $ tmMatch (snd <$> textureSet ts) tm c
 
 tmMatch :: (Integral c) => NeighborhoodTileSet
   -> TileMap c -> Coord c -> Maybe TileIndex

@@ -119,16 +119,16 @@ float = prism' toF toC
     where
       rt = fromEnum $ toRational r
 
-onFloat :: (Enum f, Fractional f, Real f, Enum c) =>
-  (f -> f) -> c -> Maybe c
+onFloat :: (Enum f, Fractional f, Real f, Enum c)
+  => (f -> f) -> c -> Maybe c
 onFloat = underPrism float
 
-fromFloat :: (Enum f, Fractional f, Real f, Enum c) =>
-  f -> Maybe c
+fromFloat :: (Enum f, Fractional f, Real f, Enum c)
+  => f -> Maybe c
 fromFloat = preview float
 
-toFloat :: (Enum f, Fractional f, Real f, Enum c) =>
-  c -> f
+toFloat :: (Enum f, Fractional f, Real f, Enum c)
+  => c -> f
 toFloat = review float
 
 -- }}}
@@ -164,6 +164,9 @@ onPair f (x,y) = (f x,f y)
 
 dup :: a -> (a,a)
 dup a = (a,a)
+
+swap :: (a,b) -> (b,a)
+swap (a,b) = (b,a)
 
 -- }}}
 

@@ -25,11 +25,14 @@ makeLenses ''TileMap
 
 -- Building {{{
 
-tmFromGrid :: (Integral c) => Grid c TileIndex -> TileMap c
+tmFromGrid :: Grid c TileIndex -> TileMap c
 tmFromGrid = TileMap
 
-mkEmptyTileMap :: (Integral c) => Size c -> TileMap c
-mkEmptyTileMap sz = tmFromGrid $ mkEmptyGrid sz 0
+emptyTileMap :: TileMap c
+emptyTileMap = tmFromGrid emptyGrid
+
+mkRepeatTileMap :: (Integral c) => Size c -> TileMap c
+mkRepeatTileMap sz = tmFromGrid $ mkRepeatGrid sz 0
 
 mkIotaTileMap :: (Integral c) => Size c -> TileMap c
 mkIotaTileMap = tmFromGrid . mkIotaGrid
@@ -41,9 +44,12 @@ csGenerateTileMap :: (Integral c) => (Coord c -> TileIndex)
   -> Coords c -> TileMap c
 csGenerateTileMap f = tmFromGrid . gridMapKeysTo f
 
-csGenerateTileMapA :: (Applicative m, Integral c) =>
-  (Coord c -> m TileIndex) -> Coords c -> m (TileMap c)
+csGenerateTileMapA :: (Applicative m, Integral c)
+  => (Coord c -> m TileIndex) -> Coords c -> m (TileMap c)
 csGenerateTileMapA f = fmap tmFromGrid . gridTraverseKeys f
+
+tmInsert :: (Ord c) => Coord c -> TileIndex -> TileMap c -> TileMap c
+tmInsert c = tmOnGrid . gridInsert c
 
 -- }}}
 
@@ -92,8 +98,8 @@ tmUpdateAtM :: (Functor m, Monad m, Ord c) => [Coord c]
   -> (TileIndex -> m TileIndex) -> TileMap c -> m (TileMap c)
 tmUpdateAtM cs = tmOnGridM . gridUpdateAtM cs
 
-tmTraverseWithKey :: (Applicative m, Ord c) =>
-  (Coord c -> TileIndex -> m TileIndex) -> TileMap c -> m (TileMap c)
+tmTraverseWithKey :: (Applicative m, Ord c)
+  => (Coord c -> TileIndex -> m TileIndex) -> TileMap c -> m (TileMap c)
 tmTraverseWithKey = tmOnGridA . gridTraverseWithKey
 
 tmUpdateWithKeyAtM :: (Functor m, Monad m, Ord c) => [Coord c]
@@ -134,6 +140,9 @@ tmMinimum, tmMaximum :: (Ord c) => TileMap c -> Maybe (Coord c, TileIndex)
 tmMinimum = gridMinimum . _tileMap
 tmMaximum = gridMaximum . _tileMap
 
+tmSize :: (Integral c) => TileMap c -> Size c
+tmSize = gridSize . _tileMap
+
 -- }}}
 
 -- Random {{{
@@ -152,6 +161,9 @@ tmSurrounding = gridSurrounding . _tileMap
 -- }}}
 
 -- Pretty Printing {{{
+
+printTileMap :: (Integral c, Show c) => TileMap c -> IO ()
+printTileMap = putStrLn . ppTileMap
 
 ppTileMap :: (Integral c, Show c) => TileMap c -> String
 ppTileMap = ppGrid . _tileMap

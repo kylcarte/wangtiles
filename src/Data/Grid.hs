@@ -33,8 +33,14 @@ csFromList cs = gridFromList $ zip cs $ repeat ()
 
 -- Grid {{{
 
-mkEmptyGrid :: (Integral c) => Size c -> a -> Grid c a
-mkEmptyGrid sz a = gridFromList $ zip cs $ repeat a
+gridFromMap :: M.Map (Coord c) a -> Grid c a
+gridFromMap = Grid
+
+emptyGrid :: Grid c a
+emptyGrid = gridFromMap M.empty
+
+mkRepeatGrid :: (Integral c) => Size c -> a -> Grid c a
+mkRepeatGrid sz a = gridFromList $ zip cs $ repeat a
   where
   cs = enumCoords sz [0..lexMaxBound sz]
 
@@ -43,12 +49,15 @@ mkIotaGrid sz = gridFromList $ zip cs [0..]
   where
   cs = enumCoords sz [0..lexMaxBound sz]
 
-mkRandomGrid :: forall a c. (Integral c, R.Random a) =>
-  (a,a) -> Size c -> Random (Grid c a)
-mkRandomGrid rng sz = T.traverse f . mkEmptyGrid sz =<< random
+mkRandomGrid :: forall a c. (Integral c, R.Random a)
+  => (a,a) -> Size c -> Random (Grid c a)
+mkRandomGrid rng sz = T.traverse f . mkRepeatGrid sz =<< random
   where
   f :: a -> Random a
   f = const $ randomR rng
+
+gridInsert :: (Ord c) => Coord c -> a -> Grid c a -> Grid c a
+gridInsert c = gridOnMap . M.insert c
 
 gridSize :: (Integral c) => Grid c a -> Size c
 gridSize =
@@ -69,11 +78,11 @@ gridOnMap = (grid %~)
 
 gridOnMapA :: (Applicative f) => (M.Map (Coord c) a -> f (M.Map (Coord c) b))
   -> Grid c a -> f (Grid c b)
-gridOnMapA f = fmap Grid . f . _grid
+gridOnMapA f = fmap gridFromMap . f . _grid
 
 gridOnMapM :: (Monad m) => (M.Map (Coord c) a -> m (M.Map (Coord c) b))
   -> Grid c a -> m (Grid c b)
-gridOnMapM f = return . Grid <=< (f . _grid)
+gridOnMapM f = return . gridFromMap <=< (f . _grid)
 
 gridLookup :: (Ord c) => Grid c a -> Coord c -> Maybe a
 gridLookup g c = M.lookup c $ _grid g
@@ -85,7 +94,7 @@ gridFilter :: (a -> Bool) -> Grid c a -> Grid c a
 gridFilter pr = gridOnMap $ M.filter pr
 
 gridFromList :: (Ord c) => [(Coord c,a)] -> Grid c a
-gridFromList = Grid . M.fromList
+gridFromList = gridFromMap . M.fromList
 
 gridContents :: Grid c a -> [(Coord c,a)]
 gridContents = M.assocs . _grid
@@ -111,8 +120,8 @@ gridTraverseWithKey f = gridOnMapA $ M.traverseWithKey f
 gridMapKeysTo :: (Coord c -> a) -> Grid c b -> Grid c a
 gridMapKeysTo = gridOnMap . mapKeysTo
 
-gridTraverseKeys :: (Applicative f, Ord c) =>
-  (Coord c -> f a) -> Grid c b -> f (Grid c a)
+gridTraverseKeys :: (Applicative f, Ord c)
+  => (Coord c -> f a) -> Grid c b -> f (Grid c a)
 gridTraverseKeys = gridOnMapA . traverseKeys
 
 
@@ -126,8 +135,8 @@ mapKeysTo = M.mapWithKey . onlyIndex
 foldrKeys :: (k -> b -> b) -> b -> M.Map k a -> b
 foldrKeys = M.foldrWithKey . onlyIndex
 
-traverseKeys :: (Applicative f, Ord k) =>
-  (k -> f a) -> M.Map k b -> f (M.Map k a)
+traverseKeys :: (Applicative f, Ord k)
+  => (k -> f a) -> M.Map k b -> f (M.Map k a)
 traverseKeys = M.traverseWithKey . onlyIndex
 
 -- }}}

@@ -14,13 +14,23 @@ newtype TileSet a = TileSet
   { tileSet :: I.IntMap a
   } deriving (Eq,Show,Functor,F.Foldable,T.Traversable)
 
+-- Building {{{
+
+tsFromMap :: I.IntMap a -> TileSet a
+tsFromMap = TileSet
+
+emptyTileSet :: TileSet a
+emptyTileSet = tsFromMap I.empty
+
+-- }}}
+
 -- Indexing {{{
 
 tsSize :: TileSet a -> TileIndex
 tsSize = I.size . tileSet
 
 tsFromList :: [(TileIndex,a)] -> TileSet a
-tsFromList = TileSet . I.fromList
+tsFromList = tsFromMap . I.fromList
 
 tsAssocs :: TileSet a -> [(TileIndex,a)]
 tsAssocs = I.assocs . tileSet
@@ -52,24 +62,25 @@ tsRandomIndex = randomKey . tileSet
 -- Mapping {{{
 
 tsMap :: (a -> b) -> TileSet a -> TileSet b
-tsMap f = TileSet . fmap f . tileSet
+tsMap f = tsFromMap . fmap f . tileSet
 
 tsFilter :: (a -> Bool) -> TileSet a -> TileSet a
-tsFilter f = TileSet . I.filter f . tileSet
+tsFilter f = tsFromMap . I.filter f . tileSet
 
 -- }}}
 
 -- Zips {{{
 
 tsZipWithL :: (a -> b -> c) -> TileSet a -> TileSet b -> Maybe (TileSet c)
-tsZipWithL f (TileSet ta) (TileSet tb) = fmap TileSet $ I.traverseWithKey g ta
+tsZipWithL f ta tb = fmap tsFromMap $ I.traverseWithKey g $ tileSet ta
   where
-  g i a = f a <$> I.lookup i tb
+  g i a = f a <$> I.lookup i (tileSet tb)
 
 tsZipWithR :: (a -> b -> c) -> TileSet a -> TileSet b -> Maybe (TileSet c)
-tsZipWithR f (TileSet ta) (TileSet tb) = fmap TileSet $ I.traverseWithKey g tb
+tsZipWithR f ta tb = fmap tsFromMap
+  $ I.traverseWithKey g $ tileSet tb
   where
-  g i b = f <$> I.lookup i ta <*> pure b
+  g i b = f <$> I.lookup i (tileSet ta) <*> pure b
 
 tsZipL :: TileSet a -> TileSet b -> Maybe (TileSet (a,b))
 tsZipL = tsZipWithL (,)

@@ -1,6 +1,9 @@
 {-# LANGUAGE ExistentialQuantification #-}
 
-module Display where
+module Display
+  ( module Display
+  , module Graphics.Gloss.Data.Picture
+  ) where
 
 import Data.Points
 import Data.TileMap
@@ -10,29 +13,31 @@ import Config.TileSet
 import Util
 
 import Control.Applicative
-import qualified Graphics.Gloss as Gloss
-import Graphics.Gloss hiding (Color, scale)
+import Data.Maybe (fromMaybe)
+import Graphics.Gloss
+import Graphics.Gloss.Data.Picture
 import Linear
 
 -- TextureSet {{{
 
 -- Instantiate to 'Size Float' ?
 data TextureSet a = TextureSet
-  { textureSet    :: TileSet a
+  { textureSet    :: TileSet (Picture,a)
   , textureSize   :: Size Float
   , renderTexture :: Picture -> a -> Picture
   }
 
-tileTexture :: TextureSet a -> TileIndex -> a
-tileTexture = tsIndex . textureSet
+tileTexture :: TextureSet a -> TileIndex -> (Picture,a)
+tileTexture ts = tsIndex (textureSet ts)
 
 mkTextureSet :: (Picture -> a -> Picture) -> TileSetConfig
-  -> TileSet a -> TextureSet a
-mkTextureSet rndr cfg ts = TextureSet
-  { textureSet  = ts
-  , textureSize = toFloat <$> tileSize cfg
-  , renderTexture = rndr
-  }
+  -> TileSet Picture -> TileSet a -> TextureSet a
+mkTextureSet rndr cfg tp ts = fromMaybe err $ TextureSet
+  <$> tsZipR tp ts
+  <*> pure (toFloat <$> tileSize cfg)
+  <*> pure rndr
+  where
+  err = error "Insufficient textures for TileSet"
 
 {-
 mkTextureSet_ :: TileSetConfig -> TextureSet ()
@@ -45,8 +50,8 @@ mkTextureSet_ cfg = TextureSet
 
 -- }}}
 
-displayPicture :: (Enum c, Real f, Enum f, Fractional f) =>
-  RenderConfig -> Size c -> Size f -> Picture -> IO ()
+displayPicture :: (Enum c, Real f, Enum f, Fractional f)
+  => RenderConfig -> Size c -> Size f -> Picture -> IO ()
 displayPicture cfg gs ts =
   display mode (windowBackground cfg)
   . scaleToWindow
@@ -62,15 +67,15 @@ displayPicture cfg gs ts =
   sc :: Float
   sc = availRes / toV2 max sz
   scaleToWindow :: Picture -> Picture
-  scaleToWindow = scale $ pure sc
+  scaleToWindow = scaleV2 $ pure sc
   --
   centerInWindow :: Picture -> Picture
-  centerInWindow = move $ reflY $ sz / 2 -- (-(h/2)) (w/2)
+  centerInWindow = moveV2 $ reflY $ sz / 2 -- (-(h/2)) (w/2)
   --
   mode = InWindow "gloss" (res,res) (0,0)
 
-displayLayers :: (Enum c, Real f, Enum f, Fractional f) =>
-  RenderConfig -> Size c -> Size f -> [Picture] -> IO ()
+displayLayers :: (Enum c, Real f, Enum f, Fractional f)
+  => RenderConfig -> Size c -> Size f -> [Picture] -> IO ()
 displayLayers cfg gs ts = displayPicture cfg gs ts . pictures
 
 displayTileMap :: (Enum c) => RenderConfig
@@ -89,26 +94,26 @@ renderTileMap cfg ts tm =
   . tmAssocs
   $ tm
   where
-  moveToOrigin = move $ reflX $ fmap toFloat $ size $ textureSize ts / 2
-  render (c,_) = moveTileToCoord cfg ts c blank -- XXX
+  moveToOrigin = moveV2 $ reflX $ fmap toFloat $ size $ textureSize ts / 2
+  render (c,(p,a)) = moveTileToCoord cfg ts c $ renderTexture ts p a
 
 moveTileToCoord :: (Enum c) => RenderConfig
   -> TextureSet a -> Coord c -> Picture -> Picture
-moveTileToCoord cfg ts cd = move $ reflX $ (coord $ toFloat <$> cd) * (sz + sp)
+moveTileToCoord cfg ts cd = moveV2 $ reflX $ (coord $ toFloat <$> cd) * (sz + sp)
   where
   sz = size $ toFloat <$> textureSize ts
   sp = pure $ toFloat $ tileSpacing cfg
 
-gridDimensions :: (Enum c, Real f, Enum f, Fractional f) =>
-  RenderConfig -> Size c -> Size f -> Size f
+gridDimensions :: (Enum c, Real f, Enum f, Fractional f)
+  => RenderConfig -> Size c -> Size f -> Size f
 gridDimensions cfg gs ts = sz * ts + sp * (sz - 1)
   where
   sz = fmap toFloat gs
   sp = pure $ toFloat $ tileSpacing cfg
 
-move :: V2 Float -> Picture -> Picture
-move = toV2 translate
+moveV2 :: V2 Float -> Picture -> Picture
+moveV2 = toV2 translate
 
-scale :: V2 Float -> Picture -> Picture
-scale = toV2 Gloss.scale
+scaleV2 :: V2 Float -> Picture -> Picture
+scaleV2 = toV2 scale
 
