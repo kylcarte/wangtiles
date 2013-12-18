@@ -38,13 +38,6 @@ instance (Monad m) => Monad (RandomT m) where
 instance MonadTrans RandomT where
     lift m = RandomT $ lift m
 
-runRandomIO :: Random a -> IO a
-runRandomIO m = do
-  g <- R.getStdGen
-  let (a,g') = runRandom m g
-  R.setStdGen g'
-  return a
-
 type Random = RandomT Identity
 
 runRandom :: RandomGen g => Random a -> g -> (a,g)

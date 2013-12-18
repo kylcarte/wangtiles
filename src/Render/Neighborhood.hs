@@ -16,10 +16,9 @@ newtype RenderNeighborhood = RenderNeighborhood
   } deriving (Eq,Show)
 
 instance RenderTile RenderNeighborhood where
-  type RenderData RenderNeighborhood = Textures
+  type RenderTable RenderNeighborhood = Textures
   buildRender tms c = do
     tm <- tmsLookup tms "neighborhood"
     RenderNeighborhood <$> tmLookup tm c
-  renderPicture ts p = fromImageRGBA8
-    $ tsIndex ts $ neighborhoodIndex p
+  chooseTexture ts p = tsLookup ts $ neighborhoodIndex p
 

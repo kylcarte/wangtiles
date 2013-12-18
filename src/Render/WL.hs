@@ -17,14 +17,13 @@ data RenderWL = RenderWL
   } deriving (Eq,Show)
 
 instance RenderTile RenderWL where
-  type RenderData RenderWL = TileSet Textures
+  type RenderTable RenderWL = TileSet Textures
   buildRender tms c = do
     wtm <- tmsLookup tms "wang"
     ltm <- tmsLookup tms "legend"
     RenderWL <$> tmLookup wtm c
              <*> tmLookup ltm c
-  renderPicture tts p = fromImageRGBA8
-    $ tsIndex ts $ wangIndex p
-    where
-    ts = tsIndex tts $ legendIndex p
+  chooseTexture tts p = do
+    ts <- tsLookup tts $ legendIndex p
+    tsLookup ts $ wangIndex p
 

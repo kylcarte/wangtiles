@@ -10,18 +10,11 @@ import Data.Surrounding
 import Util
 
 import Control.Applicative
-import Control.Lens
 import qualified Data.Traversable as T
 
--- Types {{{
-
 newtype TileMap c = TileMap
-  { _tileMap :: Grid c TileIndex
+  { tileMap :: Grid c TileIndex
   } deriving (Eq,Show)
-
-makeLenses ''TileMap
-
--- }}}
 
 -- Building {{{
 
@@ -33,6 +26,13 @@ emptyTileMap = tmFromGrid emptyGrid
 
 mkRepeatTileMap :: (Integral c) => Size c -> TileMap c
 mkRepeatTileMap sz = tmFromGrid $ mkRepeatGrid sz 0
+
+mkIotaTileMapExcept :: (Integral c)
+  => Size c -> [(Int,Int)] -> TileMap c
+mkIotaTileMapExcept sz es = tmFromList $ flip zip [0..]
+  $ concat
+  $ deleteGridIndices es
+  $ coordGrid sz
 
 mkIotaTileMap :: (Integral c) => Size c -> TileMap c
 mkIotaTileMap = tmFromGrid . mkIotaGrid
@@ -59,30 +59,30 @@ tmSubMap :: (Ord c) => Coords c -> TileMap c -> TileMap c
 tmSubMap = tmOnGrid . gridSubMap
 
 tmSubMapByValue :: (Ord c) => TileIndex -> TileMap c -> Coords c
-tmSubMapByValue ti = (() <$) . gridSubMapByValue ti . _tileMap
+tmSubMapByValue ti = (() <$) . gridSubMapByValue ti . tileMap
 
 tmFilter :: (TileIndex -> Bool) -> TileMap c -> TileMap c
 tmFilter = tmOnGrid . gridFilter
 
 tmDifference :: (Ord c) => TileMap c -> TileMap c -> TileMap c
-tmDifference = tmOnGrid . gridDifference . _tileMap
+tmDifference = tmOnGrid . gridDifference . tileMap
 
 -- }}}
 
 -- Mapping / Traversing {{{
 
 tmOnGrid :: (Grid c TileIndex -> Grid c TileIndex) -> TileMap c -> TileMap c
-tmOnGrid f = tileMap %~ f
+tmOnGrid f tm = tm { tileMap = f $ tileMap tm }
 
 tmOnGridA :: (Applicative f) => (Grid c TileIndex -> f (Grid c TileIndex))
   -> TileMap c -> f (TileMap c)
-tmOnGridA f tm = TileMap <$> f (tm^.tileMap)
+tmOnGridA f tm = TileMap <$> f (tileMap tm)
 
 tmOnGridM :: (Monad m) => (Grid c TileIndex -> m (Grid c TileIndex))
   -> TileMap c -> m (TileMap c)
 tmOnGridM f tm = do
-  g <- f (tm^.tileMap)
-  return $ tm { _tileMap = g }
+  g <- f (tileMap tm)
+  return $ tm { tileMap = g }
 
 tmUpdate :: (TileIndex -> TileIndex) -> TileMap c -> TileMap c
 tmUpdate = tmOnGrid . fmap
@@ -119,29 +119,29 @@ tmTraverseKeys = tmOnGridA . gridTraverseKeys
 -- Accessing {{{
 
 tmRows :: Integral c => TileMap c -> c
-tmRows = gridRows . _tileMap
+tmRows = gridRows . tileMap
 
 tmCols :: Integral c => TileMap c -> c
-tmCols = gridCols . _tileMap
+tmCols = gridCols . tileMap
 
 tmCoords :: Integral c => TileMap c -> [Coord c]
-tmCoords = gridKeys . _tileMap
+tmCoords = gridKeys . tileMap
 
 tmAssocs :: TileMap c -> [(Coord c,TileIndex)]
-tmAssocs = gridContents . _tileMap
+tmAssocs = gridContents . tileMap
 
 tmIndex :: (Ord c) => TileMap c -> Coord c -> TileIndex
-tmIndex tm c = gridIndex (_tileMap tm) c
+tmIndex tm c = gridIndex (tileMap tm) c
 
 tmLookup :: (Ord c) => TileMap c -> Coord c -> Maybe TileIndex
-tmLookup tm c = gridLookup (_tileMap tm) c
+tmLookup tm c = gridLookup (tileMap tm) c
 
 tmMinimum, tmMaximum :: (Ord c) => TileMap c -> Maybe (Coord c, TileIndex)
-tmMinimum = gridMinimum . _tileMap
-tmMaximum = gridMaximum . _tileMap
+tmMinimum = gridMinimum . tileMap
+tmMaximum = gridMaximum . tileMap
 
 tmSize :: (Integral c) => TileMap c -> Size c
-tmSize = gridSize . _tileMap
+tmSize = gridSize . tileMap
 
 -- }}}
 
@@ -156,7 +156,7 @@ randomTileMap rng sz = fmap TileMap . mkRandomGrid rng $ sz
 -- Surrounding {{{
 
 tmSurrounding :: (Integral c) => TileMap c -> Coord c -> Surrounding TileIndex
-tmSurrounding = gridSurrounding . _tileMap
+tmSurrounding = gridSurrounding . tileMap
 
 -- }}}
 
@@ -166,7 +166,7 @@ printTileMap :: (Integral c, Show c) => TileMap c -> IO ()
 printTileMap = putStrLn . ppTileMap
 
 ppTileMap :: (Integral c, Show c) => TileMap c -> String
-ppTileMap = ppGrid . _tileMap
+ppTileMap = ppGrid . tileMap
 
 -- }}}
 

@@ -16,10 +16,9 @@ newtype RenderWang = RenderWang
   } deriving (Eq,Show)
 
 instance RenderTile RenderWang where
-  type RenderData RenderWang = Textures
+  type RenderTable RenderWang = Textures
   buildRender tms c = do
     tm <- tmsLookup tms "wang"
     RenderWang <$> tmLookup tm c
-  renderPicture ts p = fromImageRGBA8
-    $ tsIndex ts $ wangIndex p
+  chooseTexture ts p = tsLookup ts $ wangIndex p
 

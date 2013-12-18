@@ -5,7 +5,7 @@
 
 module Data.Grid where
 
-import Control.Monad.Trans.Random
+import Control.Monad.Random
 import Data.Points
 import Util
 
@@ -21,10 +21,8 @@ import qualified Data.Traversable as T
 import qualified System.Random as R
 
 newtype Grid c a = Grid
-  { _grid :: M.Map (Coord c) a
+  { grid :: M.Map (Coord c) a
   } deriving (Eq,Show,Functor,F.Foldable,T.Traversable)
-
-makeLenses ''Grid
 
 type Coords c = Grid c ()
 
@@ -49,11 +47,13 @@ mkIotaGrid sz = gridFromList $ zip cs [0..]
   where
   cs = allCoords sz
 
-mkRandomGrid :: forall a c. (Integral c, R.Random a)
-  => (a,a) -> Size c -> Random (Grid c a)
-mkRandomGrid rng sz = T.traverse f . mkRepeatGrid sz =<< random
+mkRandomGrid :: forall a c m. (MonadRandom m, Integral c, R.Random a)
+  => (a,a) -> Size c -> m (Grid c a)
+mkRandomGrid rng sz = do
+  a <- random
+  T.mapM f $ mkRepeatGrid sz a
   where
-  f :: a -> Random a
+  f :: a -> m a
   f = const $ randomR rng
 
 gridInsert :: (Ord c) => Coord c -> a -> Grid c a -> Grid c a
@@ -67,28 +67,28 @@ gridSize =
   . (safeMaximum &&& safeMinimum)
   . map (view coordV2)
   . M.keys
-  . _grid
+  . grid
 
 gridRows, gridCols :: (Integral c) => Grid c a -> c
 gridRows = view height . gridSize
 gridCols = view  width . gridSize
 
 gridOnMap :: (M.Map (Coord c) a -> M.Map (Coord c) b) -> Grid c a -> Grid c b
-gridOnMap = (grid %~)
+gridOnMap f g = g { grid = f $ grid g }
 
 gridOnMapA :: (Applicative f) => (M.Map (Coord c) a -> f (M.Map (Coord c) b))
   -> Grid c a -> f (Grid c b)
-gridOnMapA f = fmap gridFromMap . f . _grid
+gridOnMapA f = fmap gridFromMap . f . grid
 
 gridOnMapM :: (Monad m) => (M.Map (Coord c) a -> m (M.Map (Coord c) b))
   -> Grid c a -> m (Grid c b)
-gridOnMapM f = return . gridFromMap <=< (f . _grid)
+gridOnMapM f = return . gridFromMap <=< (f . grid)
 
 gridLookup :: (Ord c) => Grid c a -> Coord c -> Maybe a
-gridLookup g c = M.lookup c $ _grid g
+gridLookup g c = M.lookup c $ grid g
 
 gridIndex :: (Ord c) => Grid c a -> Coord c -> a
-gridIndex g c = _grid g M.! c
+gridIndex g c = grid g M.! c
 
 gridFilter :: (a -> Bool) -> Grid c a -> Grid c a
 gridFilter pr = gridOnMap $ M.filter pr
@@ -97,14 +97,14 @@ gridFromList :: (Ord c) => [(Coord c,a)] -> Grid c a
 gridFromList = gridFromMap . M.fromList
 
 gridContents :: Grid c a -> [(Coord c,a)]
-gridContents = M.assocs . _grid
+gridContents = M.assocs . grid
 
 gridDifference :: (Ord c) => Grid c a -> Grid c b -> Grid c a
-gridDifference = gridOnMap . M.difference . _grid
+gridDifference = gridOnMap . M.difference . grid
 
 gridMinimum, gridMaximum :: (Ord c) => Grid c a -> Maybe (Coord c, a)
-gridMinimum = fmap fst . M.minViewWithKey . _grid
-gridMaximum = fmap fst . M.maxViewWithKey . _grid
+gridMinimum = fmap fst . M.minViewWithKey . grid
+gridMaximum = fmap fst . M.maxViewWithKey . grid
 
 gridMinimumValue, gridMaximumValue :: (Ord a, Ord c)
   => Grid c a -> Maybe (Coord c, a)
@@ -124,7 +124,7 @@ gridMaximumValue g
 -- Key Maps / Traversals {{{
 
 gridKeys :: Grid c a -> [Coord c]
-gridKeys = M.keys . _grid
+gridKeys = M.keys . grid
 
 gridTraverseWithKey :: (Applicative f) => (Coord c -> a -> f b)
   -> Grid c a -> f (Grid c b)
@@ -201,7 +201,7 @@ updateWithKeyAtM ks f mp = F.foldlM fn mp ks
 -- SubMap {{{
 
 gridSubMap :: (Ord c) => Grid c b -> Grid c a -> Grid c a
-gridSubMap cs = gridOnMap $ subMap (_grid cs)
+gridSubMap cs = gridOnMap $ subMap (grid cs)
 
 gridSubMapByValue :: (Eq a, Ord c) => a -> Grid c a -> Grid c a
 gridSubMapByValue a = gridOnMap $ subMapByValue a

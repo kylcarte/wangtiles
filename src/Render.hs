@@ -1,23 +1,16 @@
 {-# LANGUAGE TypeFamilies #-}
 
-module Render
-  ( module Render
-  , module Graphics.Gloss.Data.Picture
-  , fromImageRGBA8
-  ) where
+module Render where
 
 import Data.Points
 import Data.TileMaps
 import Data.TileSet
 import Texture
 
-import Graphics.Gloss.Data.Picture
-import Graphics.Gloss.Juicy
-
 class RenderTile p where
-  type RenderData p
+  type RenderTable p
   buildRender   :: (Ord c) => TileMaps c -> Coord c -> Maybe p
-  renderPicture :: RenderData p -> p -> Picture
+  chooseTexture :: RenderTable p -> p -> Maybe Texture
 
 type Textures = TileSet Texture
 

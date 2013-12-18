@@ -1,15 +1,15 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 module Util
   ( module Util
   , on
   ) where
 
-import Control.Monad.Trans.Random
+import Control.Monad.Random
 
-import Control.Applicative
 import Control.Arrow ((&&&))
 import Control.Lens
 import Data.Aeson
@@ -21,6 +21,7 @@ import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 import Linear
 import System.Exit
+import qualified System.Random as R
 import Text.Show.Pretty (ppShow)
 
 type TileIndex = Int
@@ -32,8 +33,12 @@ class (Functor m) => HandleIO m where
   io' :: m a -> IO a
   io' = io "HandleIO failure"
 
-instance HandleIO Random where
-  io _ = runRandomIO
+instance (HandleIO m) => HandleIO (RandomT m) where
+  io msg m = do
+    g <- R.getStdGen
+    (a,g') <- io msg $ runRandomT m g
+    R.setStdGen g'
+    return a
   io'  = io "failure in Random"
 
 instance (Show e) => HandleIO (Either e) where
@@ -75,10 +80,12 @@ decodeFile f = io errMsg . eitherDecode =<< BS.readFile f
 
 -- Random {{{
 
-randomKey :: I.IntMap a -> Random Int
-randomKey m = (ks !!) <$> randomR (0,n)
+randomKey :: MonadRandom m => I.IntMap a -> m Int
+randomKey im = do
+  a <- randomR (0,n)
+  return $ ks !! a
   where
-  ks = I.keys m
+  ks = I.keys im
   n  = length ks - 1
 
 -- }}}
@@ -170,18 +177,8 @@ onPair f (x,y) = (f x,f y)
 dup :: a -> (a,a)
 dup a = (a,a)
 
-swap :: (a,b) -> (b,a)
-swap (a,b) = (b,a)
-
--- }}}
-
--- V2 {{{
-
-foldV2 :: (R2 f) => (c -> c -> b) -> f c -> b
-foldV2 f c = f (c^._x) (c^._y)
-
-onV2 :: (Additive f) => (a -> b -> c) -> f a -> f b -> f c
-onV2 = liftI2
+swap2 :: (a,b) -> (b,a)
+swap2 (a,b) = (b,a)
 
 -- }}}
 
@@ -238,7 +235,7 @@ deleteGridIndices is rs =
   | (r,i) <- zip rs [0..]
   ]
   where
-  im = groupIndices is
+  im = groupIndices $ map swap2 is
 
 groupIndices :: [(Int,Int)] -> I.IntMap [Int]
 groupIndices = foldr f I.empty

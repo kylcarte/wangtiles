@@ -1,105 +1,23 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-module Tile.Neighborhood
-  ( Neighborhood (..)
-  , neighborhood4
-  , neighborhood8
-  , neighborhoodTileMap
-  , neighborhoodTileMapByIndex
-  , NeighborhoodTileSet
-  , NeighborhoodTextureSet
-  , ppNP
-  -- , mkNeighborhoodPicture
-  ) where
+module Tile.Neighborhood where
 
-import Data.Grid
 import Data.Points
 import Data.Surrounding
 import Data.TileMap
 import Data.TileSet
-import Display
+import Tile
 import Util
 
 import Control.Applicative
 import Control.Monad
+import Control.Monad.Error
 import Data.List  (transpose)
 import Data.Maybe (fromMaybe)
-
-{-
-instance TileLogic Neighborhood where
-  type HasTileSets Neighborhood tss = HasTileSet Neighborhood tss
-  type Index Neighborhood = TileIndex
-  type Params Neighborhood = Texture
--}
-
-type NeighborhoodTileSet = TileSet Neighborhood
-
-{-
--- Render {{{
-
-instance (MonadReader Textures m) => RenderTile m Neighborhood where
-  mkPictureProxy _ i = do
-    ts <- ask
-    return $ fromImageRGBA8 $ tsIndex ts i
-
-neighborhoodProxy :: Proxy Neighborhood
-neighborhoodProxy = Proxy
-
-mkNeighborhoodPicture :: (MonadReader Textures m) => TileIndex -> m Picture
-mkNeighborhoodPicture = mkPictureProxy neighborhoodProxy
-
--- }}}
--}
-
--- Neighborhoods {{{
-
--- TODO: decode at compile time with TH
-neighborhood4 :: TileSet Neighborhood
-neighborhood4 = decodeNeighborhood4s
-  [ [ [ "..." , "..." , "..." , "..." ]
-    , [ ".o." , ".oo" , "ooo" , "oo." ]
-    , [ ".o." , ".o." , ".o." , ".o." ]
-    ] ---------------------------------
-  , [ [ ".o." , ".o." , ".o." , ".o." ]
-    , [ ".o." , ".oo" , "ooo" , "oo." ]
-    , [ ".o." , ".o." , ".o." , ".o." ]
-    ] ---------------------------------
-  , [ [ ".o." , ".o." , ".o." , ".o." ]
-    , [ ".o." , ".oo" , "ooo" , "oo." ]
-    , [ "..." , "..." , "..." , "..." ]
-    ] ---------------------------------
-  , [ [ "..." , "..." , "..." , "..." ]
-    , [ ".o." , ".oo" , "ooo" , "oo." ]
-    , [ "..." , "..." , "..." , "..." ]
-    ]
-  ]
-
-neighborhood8 :: TileSet Neighborhood
-neighborhood8 = decodeNeighborhood8s
-  [ [ [ "..." , "..." , "..." , "..." , "..." , "..." , "..." , "ooo" , "ooo" , "ooo" ]
-    , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , "ooo" , "oo." , "ooo" , "ooo" , "ooo" ]
-    , [ ".o." , ".oo" , "ooo" , "oo." , ".o." , ".o." , ".o." , "oo." , ".o." , ".oo" ]
-    ] ---------------------------------------------------------------------------------
-  , [ [ ".o." , ".oo" , "ooo" , "oo." , ".o." , "..." , ".o." , "oo." , ".o." , ".oo" ]
-    , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , ".o." , "oo." , "ooo" , "ooo" , "ooo" ]
-    , [ ".o." , ".oo" , "ooo" , "oo." , ".o." , "..." , ".o." , "oo." , ".o." , ".oo" ]
-    ] ---------------------------------------------------------------------------------
-  , [ [ ".o." , ".oo" , "ooo" , "oo." , ".o." , ".o." , ".o." , "oo." , ".o." , ".oo" ]
-    , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , "ooo" , "oo." , "ooo" , "ooo" , "ooo" ]
-    , [ "..." , "..." , "..." , "..." , "..." , "..." , "..." , "ooo" , "ooo" , "ooo" ]
-    ] ---------------------------------------------------------------------------------
-  , [   {---} [ "..." , "..." , "..." , "..." , "oo." , ".oo" , "..." , "oo." , ".oo" ]
-    ,   {---} [ ".oo" , "ooo" , "oo." , "ooo" , "oo." , ".oo" , "ooo" , "ooo" , "ooo" ]
-    ,   {---} [ "..." , "..." , "..." , "oo." , ".o." , ".o." , ".oo" , ".o." , ".o." ]
-    ] ---------------------------------------------------------------------------------
-  , [   {---}   {---} [ "oo." , ".oo" , ".o." , ".oo" , "oo." , ".o." , ".o." , ".o." ]
-    ,   {---}   {---} [ "ooo" , "ooo" , ".oo" , "ooo" , "ooo" , "oo." , "ooo" , "ooo" ]
-    ,   {---}   {---} [ ".oo" , "oo." , ".oo" , "..." , "..." , "oo." , "oo." , ".oo" ]
-    ]
-  ]
-
--- }}}
-
--- Neighborhood {{{
 
 data Neighborhood = Neighborhood
   { nNW :: Neighbor
@@ -112,14 +30,35 @@ data Neighborhood = Neighborhood
   , nW  :: Neighbor
   } deriving (Show)
 
-type Neighbor = Maybe Bool
-
 instance Eq Neighborhood where
   x == y = eq nNW && eq nN && eq nNE
         && eq nW           && eq nE
         && eq nSW && eq nS && eq nSE
     where
     eq f = fromMaybe True $ (==) <$> f x <*> f y
+
+instance (MonadError (Coord Int) m, Applicative m)
+  => TileLogic m Neighborhood where
+  fillTileMap ts tm = tmTraverseKeys fn tm
+    where
+    fn c = maybe err return $ tmMatch ts tm c
+      where
+      err = throwError $ fromIntegral <$> c
+  ppTile t = ppRows
+    [ [ shw $ nNW t , shw $ nN  t , shw $ nNE t ]
+    , [ shw $ nW  t ,     "o"     , shw $ nE  t ]
+    , [ shw $ nSW t , shw $ nS  t , shw $ nSE t ]
+    ]
+    where
+    shw Nothing      = "*"
+    shw (Just True)  = "o"
+    shw (Just False) = "."
+
+type NeighborhoodTileSet = TileSet Neighborhood
+
+-- Neighbor {{{
+
+type Neighbor = Maybe Bool
 
 same :: Neighbor
 same = Just True
@@ -134,9 +73,13 @@ wild = Nothing
 
 -- NeighborhoodConstraint {{{
 
+tmMatch :: (Integral c) => NeighborhoodTileSet
+  -> TileMap c -> Coord c -> Maybe TileIndex
+tmMatch ts tm = fmap fst . tsGetSingle . tmMatches ts tm
+
 tmMatches :: (Integral c) => NeighborhoodTileSet
   -> TileMap c -> Coord c -> NeighborhoodTileSet
-tmMatches ts tm c = matchingNeighborhoods ts $ tmNeighborhood tm c
+tmMatches ts tm = matchingNeighborhoods ts . tmNeighborhood tm
 
 matchingNeighborhoods :: NeighborhoodTileSet
   -> Neighborhood -> NeighborhoodTileSet
@@ -218,39 +161,52 @@ mkNeighborhoods = tsMap relax . tsFromList . zip [0..]
 
 -- }}}
 
--- TileMap {{{
+-- Neighborhoods {{{
 
-type NeighborhoodTextureSet = TextureSet Neighborhood
-
-neighborhoodTileMapByIndex :: (Ord c, Integral c)
-  => NeighborhoodTextureSet -> TileIndex
-  -> TileMap c -> Either (Coord c) (TileMap c)
-neighborhoodTileMapByIndex ts ti tm = neighborhoodTileMap ts tm $ tmSubMapByValue ti tm
-
-neighborhoodTileMap :: (Integral c)
-  => NeighborhoodTextureSet -> TileMap c
-  -> Coords c -> Either (Coord c) (TileMap c)
-neighborhoodTileMap ts tm = csGenerateTileMapA fn
-  where
-  fn c = maybe (Left c) return $ tmMatch (snd <$> textureSet ts) tm c
-
-tmMatch :: (Integral c) => NeighborhoodTileSet
-  -> TileMap c -> Coord c -> Maybe TileIndex
-tmMatch ts tm c = fmap fst $ tsGetSingle $ tmMatches ts tm c
-
--- }}}
-
--- Pretty Printing {{{
-
-ppNP :: Neighborhood -> String
-ppNP n = ppRows
-  [ [ shw $ nNW n , shw $ nN  n , shw $ nNE n ]
-  , [ shw $ nW  n ,     "."     , shw $ nE  n ]
-  , [ shw $ nSW n , shw $ nS  n , shw $ nSE n ]
+-- TODO: decode at compile time with TH
+neighborhood4 :: TileSet Neighborhood
+neighborhood4 = decodeNeighborhood4s
+  [ [ [ "..." , "..." , "..." , "..." ]
+    , [ ".o." , ".oo" , "ooo" , "oo." ]
+    , [ ".o." , ".o." , ".o." , ".o." ]
+    ] ---------------------------------
+  , [ [ ".o." , ".o." , ".o." , ".o." ]
+    , [ ".o." , ".oo" , "ooo" , "oo." ]
+    , [ ".o." , ".o." , ".o." , ".o." ]
+    ] ---------------------------------
+  , [ [ ".o." , ".o." , ".o." , ".o." ]
+    , [ ".o." , ".oo" , "ooo" , "oo." ]
+    , [ "..." , "..." , "..." , "..." ]
+    ] ---------------------------------
+  , [ [ "..." , "..." , "..." , "..." ]
+    , [ ".o." , ".oo" , "ooo" , "oo." ]
+    , [ "..." , "..." , "..." , "..." ]
+    ]
   ]
-  where
-  shw Nothing  = "*"
-  shw (Just p) = show p
+
+neighborhood8 :: TileSet Neighborhood
+neighborhood8 = decodeNeighborhood8s
+  [ [ [ "..." , "..." , "..." , "..." , "..." , "..." , "..." , "ooo" , "ooo" , "ooo" ]
+    , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , "ooo" , "oo." , "ooo" , "ooo" , "ooo" ]
+    , [ ".o." , ".oo" , "ooo" , "oo." , ".o." , ".o." , ".o." , "oo." , ".o." , ".oo" ]
+    ] ---------------------------------------------------------------------------------
+  , [ [ ".o." , ".oo" , "ooo" , "oo." , ".o." , "..." , ".o." , "oo." , ".o." , ".oo" ]
+    , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , ".o." , "oo." , "ooo" , "ooo" , "ooo" ]
+    , [ ".o." , ".oo" , "ooo" , "oo." , ".o." , "..." , ".o." , "oo." , ".o." , ".oo" ]
+    ] ---------------------------------------------------------------------------------
+  , [ [ ".o." , ".oo" , "ooo" , "oo." , ".o." , ".o." , ".o." , "oo." , ".o." , ".oo" ]
+    , [ ".o." , ".oo" , "ooo" , "oo." , ".oo" , "ooo" , "oo." , "ooo" , "ooo" , "ooo" ]
+    , [ "..." , "..." , "..." , "..." , "..." , "..." , "..." , "ooo" , "ooo" , "ooo" ]
+    ] ---------------------------------------------------------------------------------
+  , [   {---} [ "..." , "..." , "..." , "..." , "oo." , ".oo" , "..." , "oo." , ".oo" ]
+    ,   {---} [ ".oo" , "ooo" , "oo." , "ooo" , "oo." , ".oo" , "ooo" , "ooo" , "ooo" ]
+    ,   {---} [ "..." , "..." , "..." , "oo." , ".o." , ".o." , ".oo" , ".o." , ".o." ]
+    ] ---------------------------------------------------------------------------------
+  , [   {---}   {---} [ "oo." , ".oo" , ".o." , ".oo" , "oo." , ".o." , ".o." , ".o." ]
+    ,   {---}   {---} [ "ooo" , "ooo" , ".oo" , "ooo" , "ooo" , "oo." , "ooo" , "ooo" ]
+    ,   {---}   {---} [ ".oo" , "oo." , ".oo" , "..." , "..." , "oo." , "oo." , ".oo" ]
+    ]
+  ]
 
 -- }}}
 

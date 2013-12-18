@@ -16,10 +16,9 @@ newtype RenderLegend = RenderLegend
   } deriving (Eq,Show)
 
 instance RenderTile RenderLegend where
-  type RenderData RenderLegend = Textures
+  type RenderTable RenderLegend = Textures
   buildRender tms c = do
     tm <- tmsLookup tms "legend"
     RenderLegend <$> tmLookup tm c
-  renderPicture ts p = fromImageRGBA8
-    $ tsIndex ts $ legendIndex p
+  chooseTexture ts p = tsLookup ts $ legendIndex p
 

@@ -15,7 +15,7 @@ import Data.Aeson
 import Data.Foldable (Foldable(..))
 import Data.Maybe (mapMaybe)
 import Data.Monoid
-import Linear
+import Linear hiding (diagonal,perp)
 import qualified System.Random as R
 
 -- Coord {{{
@@ -62,6 +62,9 @@ class IsCoord cd where
 instance IsCoord Coord where
   col = _x
   row = _y
+
+diagonal :: c -> Coord c
+diagonal c = mkCoord c c
 
 fromCoord :: (Coord c -> a) -> c -> c -> a
 fromCoord f = f .:. mkCoord
@@ -128,6 +131,9 @@ width = _x
 height :: Functor f => (c -> f c) -> Size c -> f (Size c)
 height = _y
 
+square :: c -> Size c
+square c = mkSize c c
+
 fromSize :: (Size c -> b) -> c -> c -> b
 fromSize f = f .:. mkSize
 
@@ -171,8 +177,14 @@ coordOnInt sz = underPrism $ coordInt sz
 allCoords :: (Integral c) => Size c -> [Coord c]
 allCoords sz = enumCoords sz [0..lexMaxBound sz]
 
-coordGrid :: (Integral c) => Size c -> Maybe (Size c) -> [[Coord c]]
-coordGrid sz mt =
+coordGrid :: (Integral c) => Size c -> [[Coord c]]
+coordGrid = coordMat Nothing
+
+coordGridChunks :: (Integral c) => Size c -> Size c -> [[Coord c]]
+coordGridChunks = coordMat . Just
+
+coordMat :: (Integral c) => Maybe (Size c) -> Size c -> [[Coord c]]
+coordMat mt sz =
   [ [ mkCoord x y
     | x <- xs $ view width <$> mt
     ]
@@ -198,24 +210,36 @@ lexMinBound _  = 0
 lexMaxBound :: (Integral c) => Size c -> Int
 lexMaxBound sz = coordIndex sz $ Coord $ size (sz - 1)
 
+coordSize :: Iso (Coord c) (Coord c) (Size c) (Size c)
+coordSize = iso (Size . coord) (Coord . size)
+
 -- }}}
 
--- V2 Transformations {{{
+-- V2 Maps / Folds {{{
 
-projX :: Num a => V2 a -> V2 a
+projX :: (R2 f, Num a) => f a -> f a
 projX = _y .~ 0
 
-projY :: Num a => V2 a -> V2 a
+projY :: (R1 f, Num a) => f a -> f a
 projY = _x .~ 0
 
-reflX :: Num a => V2 a -> V2 a
+reflX :: (R2 f, Num a) => f a -> f a
 reflX = _y %~ negate
 
-reflY :: Num a => V2 a -> V2 a
+reflY :: (R1 f, Num a) => f a -> f a
 reflY = _x %~ negate
 
-reflId :: Num a => V2 a -> V2 a
-reflId = (_x %~ negate) . perp
+reflId :: (R2 f, Num a) => f a -> f a
+reflId = (_x %~ negate) . swapV2
+
+foldV2 :: (R2 f) => (a -> a -> b) -> f a -> b
+foldV2 f c = f (c^._x) (c^._y)
+
+zipWithV2 :: (Additive f) => (a -> b -> c) -> f a -> f b -> f c
+zipWithV2 = liftI2
+
+swapV2 :: (R2 f) => f a -> f a
+swapV2 v = (_x .~ (v ^. _y)) . (_y .~ (v ^._x)) $ v
 
 -- }}}
 

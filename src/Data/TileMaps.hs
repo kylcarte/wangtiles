@@ -5,16 +5,24 @@ module Data.TileMaps where
 
 import Data.TileMap
 
-import Control.Lens
 import qualified Data.Map as M
 import Data.Text (Text)
 
 newtype TileMaps c = TileMaps
-  { _tileMaps :: M.Map Text (TileMap c)
+  { tileMaps :: M.Map Text (TileMap c)
   } deriving (Eq,Show)
 
-makeLenses ''TileMaps
+-- Building {{{
+
+tmsFromList :: [(Text,TileMap c)] -> TileMaps c
+tmsFromList = TileMaps . M.fromList
+
+-- }}}
+
+-- Accessing {{{
 
 tmsLookup :: TileMaps c -> Text -> Maybe (TileMap c)
-tmsLookup tms t = M.lookup t $ _tileMaps tms
+tmsLookup tms t = M.lookup t $ tileMaps tms
+
+-- }}}
 

@@ -1,14 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Tile.Legend
-  ( printRoom
-  , readRoom
-  , Room
-  , LegendSet
-  , mkLegend
-  , Legend (..)
-  -- , mkLegendPicture
-  ) where
+module Tile.Legend where
 
 import Data.Points
 import Data.TileMap
@@ -24,13 +16,6 @@ import qualified Data.Map as M
 import qualified Data.Text as T
 import qualified Data.Text.IO as T
 
-{-
-instance TileLogic Legend where
-  type HasTileSets Legend tss = HasTileSet Legend tss
-  type Index Legend = TileIndex
-  type Params Legend = Texture
--}
-
 newtype Legend = Legend
   { legend :: Text
   } deriving (Eq,Show)
@@ -40,23 +25,6 @@ mkLegend = Legend
 
 type Room = TileMap
 type LegendSet = TileSet Legend
-
-{-
--- Render {{{
-
-instance (MonadReader Textures m) => RenderTile m Legend where
-  mkPictureProxy _ i = do
-    ts <- ask
-    return $ fromImageRGBA8 $ tsIndex ts i
-
-legendProxy :: Proxy Legend
-legendProxy = Proxy
-
-mkLegendPicture :: (MonadReader Textures m) => TileIndex -> m Picture
-mkLegendPicture = mkPictureProxy legendProxy
-
--- }}}
--}
 
 -- Parsing {{{
 
@@ -113,7 +81,7 @@ parseRoom = second mkParseTileSet . foldr fn empties . zip [0..]
   fn (r,l) rp = parseRoomLine r rp l
 
 mkParseTileSet :: RBuilder -> ParseTileSet
-mkParseTileSet = tsFromList . map swap
+mkParseTileSet = tsFromList . map swap2
 
 parseRoomLine :: (Integral c) => c -> RoomParse c
   -> Text -> RoomParse c

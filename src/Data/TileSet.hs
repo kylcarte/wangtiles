@@ -2,7 +2,7 @@
 
 module Data.TileSet where
 
-import Control.Monad.Trans.Random
+import Control.Monad.Random
 import Util
 
 import Control.Applicative
@@ -22,15 +22,25 @@ tsFromMap = TileSet
 emptyTileSet :: TileSet a
 emptyTileSet = tsFromMap I.empty
 
+tsFromOrderedList :: [a] -> TileSet a
+tsFromOrderedList = tsFromList . zip [0..]
+
+tsFromListExcept :: [(Int,Int)] -> [[a]] -> TileSet a
+tsFromListExcept es =
+    tsFromList
+  . zip [0..]
+  . concat
+  . deleteGridIndices es
+
+tsFromList :: [(TileIndex,a)] -> TileSet a
+tsFromList = tsFromMap . I.fromList
+
 -- }}}
 
 -- Indexing {{{
 
 tsSize :: TileSet a -> TileIndex
 tsSize = I.size . tileSet
-
-tsFromList :: [(TileIndex,a)] -> TileSet a
-tsFromList = tsFromMap . I.fromList
 
 tsAssocs :: TileSet a -> [(TileIndex,a)]
 tsAssocs = I.assocs . tileSet
@@ -54,7 +64,7 @@ tsGetSingle ts
 
 -- Random {{{
 
-tsRandomIndex :: TileSet a -> Random TileIndex
+tsRandomIndex :: MonadRandom m => TileSet a -> m TileIndex
 tsRandomIndex = randomKey . tileSet
 
 -- }}}

@@ -16,32 +16,33 @@ build-type:          Simple
 cabal-version:       >=1.10
 
 library
-  exposed-modules:     Tile
-                       Tile.Wang
-                       Tile.Legend
-                       Tile.Neighborhood
+  exposed-modules:     Control.Monad.Random
+                       Control.Monad.Trans.Random
+                       --
                        Data.Grid
                        Data.Points
                        Data.Surrounding
                        Data.TileMap
                        Data.TileMaps
                        Data.TileSet
-                       Display
-                       Display.Neighborhood
-                       Display.Wang
-                       Control.Monad.Trans.Random
-                       Config.Render
-                       Config.Render.Wang
-                       Config.TileSet
-                       Config.TileSet.Neighborhood
-                       Config.TileSet.Wang
+                       --
+                       Tile
+                       Tile.Wang
+                       Tile.Legend
+                       Tile.Neighborhood
                        -- Poisson
                        Render
                        Render.Legend
                        Render.Neighborhood
                        Render.Wang
                        Render.WL
+                       Render.BackEnd
+                       Render.BackEnd.Gloss
+                       --
                        Texture
+                       Texture.Config
+                       Texture.Util
+                       --
                        Util
   -- other-modules:       
   other-extensions:    TemplateHaskell
