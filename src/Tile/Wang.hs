@@ -25,10 +25,7 @@ data Wang = Wang
   } deriving (Eq,Show)
 
 instance TileLogic Random Wang where
-  type CoordConstraints Wang c = ()
-  fillTileMap ts _ sm = tmTraverseKeys pickTile $ subMap sm
-    where
-    pickTile = randomWangTile ts $ subMap sm
+  fillTile = randomWangTile
   ppTile t = ppRows
     [ [ " "     , eg North , " "     ]
     , [ eg West , " "      , eg East ]
@@ -41,9 +38,8 @@ instance TileLogic Random Wang where
       Yellow -> "Y"
       Blue   -> "B"
 
-randomWangTile :: (CoordType c)
-  => TileSet Wang -> TileMap c
-  -> Coord c -> ErrorT Random TileIndex
+randomWangTile :: (CoordType c) => TileSet Wang
+  -> TileMap c -> Coord c -> ErrorT Random TileIndex
 randomWangTile ts tm cd = liftReportNothing err $ randomKey suitable
   where
   err = "No suitable Wang tile for Coord " ++ show cd

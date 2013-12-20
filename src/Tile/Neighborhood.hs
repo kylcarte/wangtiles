@@ -13,12 +13,14 @@ import Data.TileMap
 import Data.TileSet
 import Error
 import Tile
+import Tile.Legend
 import Util
 
 import Control.Applicative
 import Control.Monad
 import Data.List  (transpose)
 import Data.Maybe (fromMaybe)
+import Data.Text (Text)
 
 data Neighborhood = Neighborhood
   { nNW :: Neighbor
@@ -38,14 +40,9 @@ instance Eq Neighborhood where
     where
     eq f = fromMaybe True $ (==) <$> f x <*> f y
 
-instance TileLogic Identity Neighborhood where
-  type CoordConstraints Neighborhood c = ()
-  fillTileMap ts tm sm = tmTraverseKeys fn $ subMap sm
-    where
-    fn c = maybe err return $ tmMatch ts tm c
-      where
-      err = fail "Couldn't find a suitable neighborhood"
-  ppTile t = ppRows
+instance TileLogic IO Neighborhood where
+  fillTile = tmMatch
+  ppTile t = ppPadStringRows
     [ [ shw $ nNW t , shw $ nN  t , shw $ nNE t ]
     , [ shw $ nW  t ,     "o"     , shw $ nE  t ]
     , [ shw $ nSW t , shw $ nS  t , shw $ nSE t ]
@@ -56,6 +53,13 @@ instance TileLogic Identity Neighborhood where
     shw (Just False) = "."
 
 type NeighborhoodTileSet = TileSet Neighborhood
+
+fillNeighborhood :: (TileLogic m t, CoordType c)
+  => [(Text,TileSet t)] -> Legend
+  -> TileMap c -> ErrorT m (TileMap c)
+fillNeighborhood = fillSubMapsByIndex $ \i c ->
+  "No suitable neighborhood for Coord " ++ show c ++
+    "in SubMap with index " ++ show i
 
 -- Neighbor {{{
 
@@ -74,9 +78,9 @@ wild = Nothing
 
 -- NeighborhoodConstraint {{{
 
-tmMatch :: (CoordType c) => NeighborhoodTileSet
-  -> TileMap c -> Coord c -> Maybe TileIndex
-tmMatch ts tm = fmap fst . tsGetSingle . tmMatches ts tm
+tmMatch :: (Monad m, CoordType c) => NeighborhoodTileSet
+  -> TileMap c -> Coord c -> ErrorT m TileIndex
+tmMatch ts tm c = return . fst =<< tsGetSingle (tmMatches ts tm c)
 
 tmMatches :: (CoordType c) => NeighborhoodTileSet
   -> TileMap c -> Coord c -> NeighborhoodTileSet

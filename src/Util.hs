@@ -12,6 +12,7 @@ import Control.Arrow ((&&&))
 import Control.Lens
 import Data.Bifunctor
 import Data.Function (on)
+import Data.Maybe (fromMaybe)
 import qualified Data.IntMap as I
 import qualified Data.Map as M
 import qualified Data.Foldable as F
@@ -57,6 +58,9 @@ ppPadStringRows rs = ppStringRows $ map (map pad) rs
 
 ppRows :: (Ord a, Show a) => [[a]] -> String
 ppRows = ppPadStringRows . map (map show)
+
+ppSparseStringRows :: [[Maybe String]] -> String
+ppSparseStringRows = ppPadStringRows . map (map $ fromMaybe "")
 
 ppSparseRows :: (Ord a, Show a) => [[Maybe a]] -> String
 ppSparseRows = ppPadStringRows . map (map $ maybe "" show)

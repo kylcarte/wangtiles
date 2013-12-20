@@ -42,7 +42,7 @@ lowerHandleError :: (Monad m) => ErrorT m a -> (String -> m b) -> (a -> m b) -> 
 lowerHandleError m f s = either f s =<< runErrorT m
 
 handleError :: Error a -> (String -> b) -> (a -> b) -> b
-handleError m f s = runIdentity $ handleError m (Identity . f) (Identity . s)
+handleError m f s = runIdentity $ lowerHandleError m (Identity . f) (Identity . s)
 
 catch :: (Monad m) => ErrorT m a -> (String -> ErrorT m a) -> ErrorT m a
 catch m f = ErrorT $ do

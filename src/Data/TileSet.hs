@@ -11,6 +11,7 @@ import Data.Maybe (fromMaybe)
 import qualified Data.IntMap as I
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
+import Text.Show.Pretty
 
 newtype TileSet a = TileSet
   { tileSet :: I.IntMap a
@@ -71,12 +72,27 @@ tsLookup ts i = reportNothing err $ I.lookup i $ tileSet ts
   where
   err = "Couldn't find index " ++ show i ++ " in TileSet:\n" ++ ppTileSet ts
 
-tsGetSingle :: TileSet a -> Maybe (TileIndex,a)
+tsGetSingle :: (Monad m,Show a) => TileSet a -> ErrorT m (TileIndex,a)
 tsGetSingle ts
+  | [] <- as
+  = fail "Empty TileSet"
   | [a] <- tsAssocs ts
-  = Just a
+  = return a
   | otherwise
-  = Nothing
+  = fail $ "Multiple elements in TileSet:\n" ++ ppShow as
+  where
+  as = tsAssocs ts
+
+tsGetSingle' :: (Monad m) => TileSet a -> ErrorT m (TileIndex,a)
+tsGetSingle' ts
+  | [] <- as
+  = fail "Empty TileSet"
+  | [a] <- tsAssocs ts
+  = return a
+  | otherwise
+  = fail $ "Multiple elements in TileSet"
+  where
+  as = tsAssocs ts
 
 -- }}}
 

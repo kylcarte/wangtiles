@@ -11,19 +11,21 @@ import Util
 
 import Data.Text (Text, unpack)
 
-selectTileFor :: (CoordType c) => Text -> TileData c -> [(Text,Textures)]
-  -> TileIndex -> Coord c -> Error Texture
-selectTileFor setName td tex leg cd = wrapFail err $ do
+selectTileFor :: (CoordType c) => Text -> [(Text,Textures)]
+  -> TileData c -> TileIndex -> Coord c -> Error (Maybe Texture)
+selectTileFor setName tex td leg cd = wrapFail err $ do
   nm <- tdLegendName td leg
-  ts <- errorLookup' tex nm
-  wi <- tileIndexAt td cd setName
-  tsLookup' ts wi
+  case dropError $ errorLookup' tex nm of
+    Nothing -> return Nothing
+    Just ts -> do
+      wi <- tileIndexAt td cd setName
+      return $ dropError $ tsLookup' ts wi
   where
-  err = "selectTileFor" ++ unpack setName
+  err = "selectTileFor '" ++ unpack setName ++ "'"
 
 selectWangTile, selectNeighborhoodTile :: (CoordType c)
-  => TileData c -> [(Text,Textures)]
-  -> TileIndex -> Coord c -> Error Texture
+  => [(Text,Textures)] -> TileData c
+  -> TileIndex -> Coord c -> Error (Maybe Texture)
 selectWangTile = selectTileFor "wang"
 selectNeighborhoodTile = selectTileFor "neighborhood"
 

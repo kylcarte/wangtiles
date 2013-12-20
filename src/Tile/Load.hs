@@ -42,7 +42,7 @@ buildTileMaps ms = tmsFromList <$> mapM loadOne ms
 
 withLegend :: HandleIO m => (Legend -> TileMap c -> m (TileMap c))
   -> Legend -> TileMap c -> IO (TileMap c)
-withLegend f leg = io' . f leg
+withLegend f leg tm = io' $ f leg tm
 
 tdLookupMap :: (CoordType c) => TileData c -> Text -> Error (TileMap c)
 tdLookupMap = tmsLookup . dataLayers

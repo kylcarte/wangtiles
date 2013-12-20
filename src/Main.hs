@@ -19,6 +19,7 @@ import Tile.Legend
 import Tile.Neighborhood
 import Tile.Wang
 import Util
+import Util.HandleIO
 
 import Control.Monad
 import System.Environment
@@ -48,7 +49,7 @@ main = do
 
   td <- buildTileData mapFile
     [ ( "neighborhood"
-      , withLegend $ fillTileMapByIndex
+      , io' .:. fillNeighborhood
           [ ( "Wall"  , neighborhood8 )
           -- , ( "Floor" , neighborhood4 )
           -- , ( "Water" , neighborhood4 )
@@ -56,9 +57,10 @@ main = do
       )
     ]
 
+  putStrLn "Building Gloss Config"
   let glossConfig = mkDefaultGlossConfig $ baseSize td
   putStrLn $ ppTileData td
-  displayBaseTileMap glossConfig td
-    $ selectNeighborhoodTile td 
-      [ ( "Wall" , blob ) ]
+  displayBaseTileMap glossConfig td $
+    selectNeighborhoodTile
+    [ ( "Wall" , blob ) ]
 

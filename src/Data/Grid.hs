@@ -212,13 +212,13 @@ updateWithKeyAtM ks f mp = F.foldlM fn mp ks
 -- SubMap {{{
 
 gridSubMap :: (Ord c) => Grid c b -> Grid c a -> Grid c a
-gridSubMap cs = gridOnMap $ subMap (grid cs)
+gridSubMap cs = gridOnMap $ mSubMap (grid cs)
 
 gridSubMapByValue :: (Eq a, Ord c) => a -> Grid c a -> Grid c a
 gridSubMapByValue a = gridOnMap $ subMapByValue a
 
-subMap :: (Ord k) => M.Map k b -> M.Map k a -> M.Map k a
-subMap = filterKeys . flip M.member
+mSubMap :: (Ord k) => M.Map k b -> M.Map k a -> M.Map k a
+mSubMap = filterKeys . flip M.member
 
 subMapByValue :: (Eq a, Ord k) => a -> M.Map k a -> M.Map k a
 subMapByValue = M.filter . (==)

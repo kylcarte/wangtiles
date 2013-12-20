@@ -6,36 +6,50 @@
 
 module Tile where
 
+import Data.Grid
 import Data.Points
 import Data.TileMap
 import Data.TileSet
 import Error
 import Tile.Legend
+import Util
+import Util.HandleIO
 
 import Control.Applicative
 import Data.Text (Text, unpack)
-import GHC.Exts (Constraint)
+import qualified Data.Traversable as T
 
 class (Applicative m, Monad m, Show t) => TileLogic m t | t -> m where
-  type CoordConstraints t c :: Constraint
-  fillTileMap :: (CoordType c, CoordConstraints t c)
-    => TileSet t -> TileMap c -> SubMap c -> ErrorT m (TileMap c)
-  ----
+  fillTile :: (CoordType c) => TileSet t -> TileMap c
+    -> Coord c -> ErrorT m TileIndex
   ppTile :: t -> String
-  ----
 
-  fillTileMapByIndex :: (CoordType c, CoordConstraints t c)
-    => [(Text,TileSet t)] -> Legend -> TileMap c -> ErrorT m (TileMap c)
-  fillTileMapByIndex tls leg tm = do
-    tms <- tsTraverseWithKey fillOne $ tmSubMapSetByIndex tm
-    return $ tmUnions $ tsValues tms
-    where
-    err i = "fillTileMapByIndex at index " ++ show i
-    fillOne i sm = wrapFail (err i) $ do
-      tss <- buildTileSets leg tls
-      case dropError $ tsLookup tss i of
-        Nothing -> return $ emptyTileMap
-        Just ts -> fillTileMap ts tm sm
+fillSubMap :: (TileLogic m t, CoordType c)
+  => (Coord c -> String) -> TileSet t -> TileMap c
+  -> SubMap c -> ErrorT m (TileMap c)
+fillSubMap fl ts tm sm = tmTraverseKeys fn $ subMap sm
+  where
+  fn c = wrapFail (fl c) $ fillTile ts tm c
+
+ppFilledTileMap :: (HandleIO n, TileLogic m t, CoordType c)
+  => TileSet t -> TileMap c -> ErrorT n String
+ppFilledTileMap ts tm = do
+  g <- T.mapM (tsLookup ts) $ tileMap tm
+  let pg = fmap ppTile g
+  return $ ppSparseStringRows $ gridList pg
+
+fillSubMapsByIndex :: (TileLogic m t, CoordType c)
+  => (TileIndex -> Coord c -> String) -> [(Text,TileSet t)]
+  -> Legend -> TileMap c -> ErrorT m (TileMap c)
+fillSubMapsByIndex fl tls leg tm = do
+  tms <- tsTraverseWithKey fillOne $ tmSubMapSetByIndex tm
+  return $ tmUnions $ tsValues tms
+  where
+  fillOne i sm = do
+    tss <- buildTileSets leg tls
+    case dropError $ tsLookup tss i of
+      Nothing -> return $ emptyTileMap
+      Just ts -> fillSubMap (fl i) ts tm sm
     
 type TileSets t = TileSet (TileSet t)
 
