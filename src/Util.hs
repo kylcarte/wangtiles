@@ -8,52 +8,18 @@ module Util
   , on
   ) where
 
-import Control.Monad.Random
-
 import Control.Arrow ((&&&))
 import Control.Lens
-import Data.Aeson
-import qualified Data.ByteString.Lazy as BS
 import Data.Bifunctor
 import Data.Function (on)
 import qualified Data.IntMap as I
+import qualified Data.Map as M
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
 import Linear
-import System.Exit
-import qualified System.Random as R
 import Text.Show.Pretty (ppShow)
 
 type TileIndex = Int
-
--- HandleIO {{{
-
-class (Functor m) => HandleIO m where
-  io :: String -> m a -> IO a
-  io' :: m a -> IO a
-  io' = io "HandleIO failure"
-
-instance (HandleIO m) => HandleIO (RandomT m) where
-  io msg m = do
-    g <- R.getStdGen
-    (a,g') <- io msg $ runRandomT m g
-    R.setStdGen g'
-    return a
-  io'  = io "failure in Random"
-
-instance (Show e) => HandleIO (Either e) where
-  io msg m = case m of
-    Left e -> do putStrLn $ msg ++ ": " ++ show e
-                 exitFailure
-    Right a -> return a
-  io' = either err return
-    where
-    err e = fail $ "failure at: " ++ show e
-
-instance HandleIO Maybe where
-  io msg = maybe (fail msg) return
-
--- }}}
 
 -- Traversals {{{
 
@@ -69,34 +35,73 @@ tzip = tzipWith (,)
 
 -- }}}
 
--- JSON {{{
-
-decodeFile :: FromJSON a => FilePath -> IO a
-decodeFile f = io errMsg . eitherDecode =<< BS.readFile f
-  where
-  errMsg = "couldn't parse file '" ++ f ++ "' to JSON"
-
--- }}}
-
--- Random {{{
-
-randomKey :: MonadRandom m => I.IntMap a -> m Int
-randomKey im = do
-  a <- randomR (0,n)
-  return $ ks !! a
-  where
-  ks = I.keys im
-  n  = length ks - 1
-
--- }}}
-
 -- Pretty Printing {{{
+
+addLine :: String -> String -> String
+addLine l1 l2 = l1 ++ "\n" ++ l2
 
 disp :: Show a => a -> IO ()
 disp = putStrLn . ppShow
 
-ppRows :: [[String]] -> String
-ppRows = unlines . map unwords
+ppLines :: [String] -> String
+ppLines = unlines
+
+ppStringRows :: [[String]] -> String
+ppStringRows = ppLines . map unwords
+
+ppPadStringRows :: [[String]] -> String
+ppPadStringRows rs = ppStringRows $ map (map pad) rs
+  where
+  pad s = replicate (mxdigits - length s) ' ' ++ s
+  mxdigits = safeMaximum 0 $ map length $ concat rs
+
+ppRows :: (Ord a, Show a) => [[a]] -> String
+ppRows = ppPadStringRows . map (map show)
+
+ppSparseRows :: (Ord a, Show a) => [[Maybe a]] -> String
+ppSparseRows = ppPadStringRows . map (map $ maybe "" show)
+
+ppRowsByCol :: (Ord a, Show a) => [[a]] -> String
+ppRowsByCol = ppPadStringRowsByCol . map (map show)
+
+ppSparseRowsByCol :: (Ord a, Show a) => [[Maybe a]] -> String
+ppSparseRowsByCol = ppPadStringRowsByCol . map (map $ maybe "" show)
+
+ppPadStringRows2Col :: (Ord a, Show a,Show b) => [(a,b)] -> String
+ppPadStringRows2Col es = ppStringRows $ padStringsByCol (zip ls [True,False,False]) rs
+  where
+  rs  = map entry es
+  ls = maxColumnWidths rs
+  entry (a,b) = [show a,":",show b]
+
+ppPadStringRowsByCol :: [[String]] -> String
+ppPadStringRowsByCol rs = ppStringRows $ padStringsByCol (zip (maxColumnWidths rs) (repeat True)) rs
+
+maxColumnWidths :: [[[a]]] -> [Int]
+maxColumnWidths = safeMaximumV2 [] . map (map length)
+
+padStringsByCol :: [(Int,Bool)] -> [[String]] -> [[String]]
+padStringsByCol ls = map (zipWith (curry pad) ls)
+  where
+  pad ((n,justifyRight),s) = ($ replicate (n - length s) ' ') $ if justifyRight then (++ s) else (s ++)
+
+-- }}}
+
+-- Ord {{{
+
+safeMinimumV2 :: (Ord a, F.Foldable t, Additive f)
+  => f a -> t (f a) -> f a
+safeMinimumV2 = F.foldl' $ liftU2 min
+
+safeMaximumV2 :: (Ord a, F.Foldable t, Additive f)
+  => f a -> t (f a) -> f a
+safeMaximumV2 = F.foldl' $ liftU2 max
+
+safeMinimum :: (Ord a) => a -> [a] -> a
+safeMinimum = F.foldl' min
+
+safeMaximum :: (Ord a) => a -> [a] -> a
+safeMaximum = F.foldl' max
 
 -- }}}
 
@@ -104,14 +109,6 @@ ppRows = unlines . map unwords
 
 withFloat :: (Float -> Float) -> Int -> Int
 withFloat f = fromEnum . f . toEnum
-
-safeMinimum :: (Num (f a), Ord a, F.Foldable t, Additive f)
-  => t (f a) -> f a
-safeMinimum = F.foldl' (liftU2 min) 0
-
-safeMaximum :: (Num (f a), Ord a, F.Foldable t, Additive f)
-  => t (f a) -> f a
-safeMaximum = F.foldl' (liftU2 max) 0
 
 float :: (Real f, Enum f, Fractional f, Enum c) => Prism' f c
 float = prism' toF toC
@@ -227,7 +224,7 @@ underPrism pr f = preview pr . f . review pr
 
 -- }}}
 
--- List selection {{{
+-- Lists {{{
 
 deleteGridIndices :: [(Int,Int)] -> [[a]] -> [[a]]
 deleteGridIndices is rs =
@@ -257,6 +254,13 @@ deleteIndices (Just is) as =
 -- Proxy {{{
 
 data Proxy a = Proxy
+
+-- }}}
+
+-- Maps {{{
+
+flipMap :: (Ord k, Ord a) => M.Map k a -> M.Map a k
+flipMap = M.fromList . map swap2 . M.assocs
 
 -- }}}
 

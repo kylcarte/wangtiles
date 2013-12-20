@@ -2,10 +2,12 @@
 
 module Data.TileSet where
 
-import Control.Monad.Random
+import Error
 import Util
 
 import Control.Applicative
+import Control.Monad
+import Data.Maybe (fromMaybe)
 import qualified Data.IntMap as I
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
@@ -35,9 +37,15 @@ tsFromListExcept es =
 tsFromList :: [(TileIndex,a)] -> TileSet a
 tsFromList = tsFromMap . I.fromList
 
+tsGenerate :: (TileIndex -> a) -> TileSet a
+tsGenerate f = tsFromList $ zip is as
+  where
+  is = [0..]
+  as = map f is
+
 -- }}}
 
--- Indexing {{{
+-- Accessing {{{
 
 tsSize :: TileSet a -> TileIndex
 tsSize = I.size . tileSet
@@ -45,13 +53,23 @@ tsSize = I.size . tileSet
 tsAssocs :: TileSet a -> [(TileIndex,a)]
 tsAssocs = I.assocs . tileSet
 
-tsIndex :: TileSet a -> TileIndex -> a
-tsIndex ts i = case I.lookup i $ tileSet ts of
-  Just a -> a
-  Nothing -> error $ "key " ++ show i ++ " is not in TileSet"
+tsValues :: TileSet a -> [a]
+tsValues = I.elems . tileSet
 
-tsLookup :: TileSet a -> TileIndex -> Maybe a
-tsLookup ts i = I.lookup i $ tileSet ts
+tsIndex :: TileSet a -> TileIndex -> a
+tsIndex ts i = fromMaybe (error err) $ I.lookup i $ tileSet ts
+  where
+  err = "key " ++ show i ++ " is not in TileSet"
+
+tsLookup' :: (Monad m) => TileSet a -> TileIndex -> ErrorT m a
+tsLookup' ts i = reportNothing err $ I.lookup i $ tileSet ts
+  where
+  err = "Couldn't find index " ++ show i ++ " in TileSet"
+
+tsLookup :: (Monad m, Show a) => TileSet a -> TileIndex -> ErrorT m a
+tsLookup ts i = reportNothing err $ I.lookup i $ tileSet ts
+  where
+  err = "Couldn't find index " ++ show i ++ " in TileSet:\n" ++ ppTileSet ts
 
 tsGetSingle :: TileSet a -> Maybe (TileIndex,a)
 tsGetSingle ts
@@ -62,20 +80,30 @@ tsGetSingle ts
 
 -- }}}
 
--- Random {{{
+-- Maps / Traversals {{{
 
-tsRandomIndex :: MonadRandom m => TileSet a -> m TileIndex
-tsRandomIndex = randomKey . tileSet
+tsOnMap :: (I.IntMap a -> I.IntMap b) -> TileSet a -> TileSet b
+tsOnMap f = tsFromMap . f . tileSet
 
--- }}}
+tsOnMapA :: (Applicative f) => (I.IntMap a -> f (I.IntMap b)) -> TileSet a -> f (TileSet b)
+tsOnMapA f = fmap tsFromMap . f . tileSet
 
--- Mapping {{{
+tsOnMapM :: (Monad m) => (I.IntMap a -> m (I.IntMap b)) -> TileSet a -> m (TileSet b)
+tsOnMapM f = (return . tsFromMap) <=< (f . tileSet)
 
 tsMap :: (a -> b) -> TileSet a -> TileSet b
-tsMap f = tsFromMap . fmap f . tileSet
+tsMap = tsOnMap . fmap
 
 tsFilter :: (a -> Bool) -> TileSet a -> TileSet a
-tsFilter f = tsFromMap . I.filter f . tileSet
+tsFilter = tsOnMap . I.filter
+
+tsTraverseWithKey :: (Applicative f) => (TileIndex -> a -> f b) -> TileSet a -> f (TileSet b)
+tsTraverseWithKey = tsOnMapA . I.traverseWithKey
+
+{-
+tsMapMWithKey :: (Monad f) => (TileIndex -> a -> f b) -> TileSet a -> f (TileSet b)
+tsMapMWithKey = tsOnMapM . 
+-}
 
 -- }}}
 
@@ -97,6 +125,13 @@ tsZipL = tsZipWithL (,)
 
 tsZipR :: TileSet a -> TileSet b -> Maybe (TileSet (a,b))
 tsZipR = tsZipWithR (,)
+
+-- }}}
+
+-- Pretty Printing {{{
+
+ppTileSet :: (Show a) => TileSet a -> String
+ppTileSet = ppPadStringRows2Col . tsAssocs
 
 -- }}}
 

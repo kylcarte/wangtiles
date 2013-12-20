@@ -3,23 +3,35 @@
 
 module Texture
   ( Texture
-  , loadTextureMap
-  , TileSetConfig (..)
+  , Textures
+  , loadTextures
+  , loadTexturesFrom
+  , TextureConfig (..)
   , StdConfig (..)
   ) where
 
 import Data.Points
 import Data.TileSet
 import Texture.Config
+import Util.HandleIO
 
 import Control.Applicative
 import Data.List ((\\))
+import qualified Data.Map as M
+import Data.Text (Text)
 import Codec.Picture
+
+type Textures = TileSet Texture
 
 type Texture = Image PixelRGBA8
 
-loadTextureMap :: TileSetConfig c => c -> IO (TileSet Texture)
-loadTextureMap cfg = splitAndRender <$> loadTexture (textureFile cfg)
+loadTexturesFrom :: TextureConfig c => TextureConfigs c -> Text -> IO (TileSet Texture)
+loadTexturesFrom cfgs nm = do
+  cfg <- io' $ M.lookup nm cfgs
+  loadTextures cfg
+
+loadTextures :: TextureConfig c => c -> IO (TileSet Texture)
+loadTextures cfg = splitAndRender <$> loadTexture (textureFile cfg)
   where
   splitAndRender = 
       tsFromOrderedList

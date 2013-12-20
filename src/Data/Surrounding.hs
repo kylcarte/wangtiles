@@ -6,7 +6,7 @@ import Data.Points
 import Util
 
 import Control.Lens
-import Data.Maybe (fromMaybe)
+import Data.Array
 
 data Surrounding a = Surrounding
   { sC  :: a
@@ -22,7 +22,7 @@ data Surrounding a = Surrounding
 
 -- Building {{{
 
-gridSurrounding :: (Integral c) => Grid c a -> Coord c -> Surrounding a
+gridSurrounding :: (CoordType c) => Grid c a -> Coord c -> Surrounding a
 gridSurrounding g c = Surrounding
   { sC  = gridIndex g c
   , sNW = lu . n.w $ c
@@ -48,7 +48,7 @@ gridSurrounding g c = Surrounding
 ppSurrounding :: (Show a) => Surrounding a -> String
 ppSurrounding sd = ppRows $ map (map pad) ss
   where
-  ss = map (map $ fromMaybe "*" . fmap show . ($ sd))
+  ss = map (map $ maybe "*" show . ($ sd))
     [ [ sNW , sN , sNE ]
     , [ sW  ,  c , sE  ]
     , [ sSW , sS , sSE ]
@@ -62,4 +62,9 @@ printSurrounding :: (Show a) => Surrounding a -> IO ()
 printSurrounding = putStrLn . ppSurrounding
 
 -- }}}
+
+data Locality c t a = Locality
+  { locus    :: a
+  , locality :: Array (Coord c) (Maybe (t,a))
+  } deriving (Eq,Ord,Show)
 

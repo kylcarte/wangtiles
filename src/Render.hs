@@ -1,16 +1,29 @@
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE OverloadedStrings #-}
 
 module Render where
 
 import Data.Points
-import Data.TileMaps
 import Data.TileSet
+import Error
 import Texture
+import Tile.Load
+import Util
 
-class RenderTile p where
-  type RenderTable p
-  buildRender   :: (Ord c) => TileMaps c -> Coord c -> Maybe p
-  chooseTexture :: RenderTable p -> p -> Maybe Texture
+import Data.Text (Text, unpack)
 
-type Textures = TileSet Texture
+selectTileFor :: (CoordType c) => Text -> TileData c -> [(Text,Textures)]
+  -> TileIndex -> Coord c -> Error Texture
+selectTileFor setName td tex leg cd = wrapFail err $ do
+  nm <- tdLegendName td leg
+  ts <- errorLookup' tex nm
+  wi <- tileIndexAt td cd setName
+  tsLookup' ts wi
+  where
+  err = "selectTileFor" ++ unpack setName
+
+selectWangTile, selectNeighborhoodTile :: (CoordType c)
+  => TileData c -> [(Text,Textures)]
+  -> TileIndex -> Coord c -> Error Texture
+selectWangTile = selectTileFor "wang"
+selectNeighborhoodTile = selectTileFor "neighborhood"
 

@@ -1,11 +1,12 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module Render.BackEnd.Gloss where
 
 import Data.Points
 import Render.BackEnd
 import Util
+import Util.HandleIO
 
 import Control.Applicative
 import Control.Lens
@@ -22,13 +23,13 @@ data GlossConfig = GlossConfig
   , glossTileSpacing      :: Size Float
   } deriving (Eq,Show)
 
-mkDefaultGlossConfig :: Size Int -> Size Float -> GlossConfig
-mkDefaultGlossConfig gs ts = GlossConfig
+mkDefaultGlossConfig :: Size Int -> GlossConfig
+mkDefaultGlossConfig gs = GlossConfig
   { glossScreenBorder     = 20
   , glossScreenSize       = 600
   , glossWindowBackground = Gloss.black
   , glossGridSize         = gs
-  , glossTextureSize      = ts
+  , glossTextureSize      = 16
   , glossTileSpacing      = 0
   }
 
@@ -36,11 +37,14 @@ newtype GlossTexture = GlossTexture
   { glossTexture :: Gloss.Picture
   } deriving (Eq,Show)
 
-instance BackEnd GlossConfig GlossTexture where
-  display cfg = Gloss.display mode (glossWindowBackground cfg)
-    . scaleToWindow
-    . centerInWindow
-    . glossTexture
+instance BackEnd GlossConfig where
+  type Picture GlossConfig = GlossTexture
+  display cfg mp = do
+    p <- io "Couldn't render texture" mp
+    Gloss.display mode (glossWindowBackground cfg)
+      $ scaleToWindow
+      $ centerInWindow
+      $ glossTexture p
     where
     gs, sp, sz, res, brd :: Size Float
     gs   = toFloat <$> glossGridSize cfg
@@ -62,12 +66,15 @@ instance BackEnd GlossConfig GlossTexture where
     --
     mode = Gloss.InWindow "gloss" (res'^.widthHeight) (0,0)
   ----------------------------------------------------------
-  renderTexture cfg cd =
-      GlossTexture
-    . moveToCoord cfg cd
+  renderTextureAt cfg cd =
+      return
+    . GlossTexture
+    . moveToCoord cfg
+      (fromEnum <$> cd)
     . fromImageRGBA8
   ----------------------------------------------------------
-  layers _ = GlossTexture . views (mapping glossPicture) Gloss.pictures
+  blankPicture _ = GlossTexture Gloss.blank
+  pictures     _ = GlossTexture . views (mapping glossPicture) Gloss.pictures
 
 
 glossPicture :: Iso' GlossTexture Gloss.Picture

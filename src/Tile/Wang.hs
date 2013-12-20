@@ -1,17 +1,18 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module Tile.Wang where
 
-import Control.Monad.Random
 import Data.Points
 import Data.TileMap
 import Data.TileSet
+import Error
+import Random
 import Tile
 import Util
 
-import Control.Applicative
 import Control.Lens
 import Data.List (delete)
 import qualified Data.Map as M
@@ -23,10 +24,11 @@ data Wang = Wang
   { tColors :: M.Map Edge Color
   } deriving (Eq,Show)
 
-instance (Applicative m, MonadRandom m) => TileLogic m Wang where
-  fillTileMap ts tm = tmTraverseKeys pickTile tm
+instance TileLogic Random Wang where
+  type CoordConstraints Wang c = ()
+  fillTileMap ts _ sm = tmTraverseKeys pickTile $ subMap sm
     where
-    pickTile = randomWangTile ts tm
+    pickTile = randomWangTile ts $ subMap sm
   ppTile t = ppRows
     [ [ " "     , eg North , " "     ]
     , [ eg West , " "      , eg East ]
@@ -39,11 +41,12 @@ instance (Applicative m, MonadRandom m) => TileLogic m Wang where
       Yellow -> "Y"
       Blue   -> "B"
 
-randomWangTile :: (Eq c, Ord c, Num c, MonadRandom m)
+randomWangTile :: (CoordType c)
   => TileSet Wang -> TileMap c
-  -> Coord c -> m TileIndex
-randomWangTile ts tm cd = tsRandomIndex suitable
+  -> Coord c -> ErrorT Random TileIndex
+randomWangTile ts tm cd = liftReportNothing err $ randomKey suitable
   where
+  err = "No suitable Wang tile for Coord " ++ show cd
   suitable = selectTiles cs ts
   cs = colorConstraints
          [ ( edge
@@ -51,7 +54,7 @@ randomWangTile ts tm cd = tsRandomIndex suitable
              tsIndex ts prev
            )
          | (edge,mkPrev) <- [(West,left),(North,above)]
-         , Just prev     <- [tmLookup tm $ mkPrev cd]
+         , Just prev     <- [dropError $ tmLookup tm $ mkPrev cd]
          ]
   left  = col -~ 1
   above = row -~ 1
@@ -134,7 +137,7 @@ selectTiles cs = tsFilter $ satisfies cs
 
 -- }}}
 
--- TileSets {{{
+-- Tile Sets {{{
 
 wangTiles2x2 :: TileSet Wang
 wangTiles2x2 = mkTiles

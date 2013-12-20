@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -10,12 +11,12 @@ import Data.Points
 import Data.Surrounding
 import Data.TileMap
 import Data.TileSet
+import Error
 import Tile
 import Util
 
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Error
 import Data.List  (transpose)
 import Data.Maybe (fromMaybe)
 
@@ -37,13 +38,13 @@ instance Eq Neighborhood where
     where
     eq f = fromMaybe True $ (==) <$> f x <*> f y
 
-instance (MonadError (Coord Int) m, Applicative m)
-  => TileLogic m Neighborhood where
-  fillTileMap ts tm = tmTraverseKeys fn tm
+instance TileLogic Identity Neighborhood where
+  type CoordConstraints Neighborhood c = ()
+  fillTileMap ts tm sm = tmTraverseKeys fn $ subMap sm
     where
     fn c = maybe err return $ tmMatch ts tm c
       where
-      err = throwError $ fromIntegral <$> c
+      err = fail "Couldn't find a suitable neighborhood"
   ppTile t = ppRows
     [ [ shw $ nNW t , shw $ nN  t , shw $ nNE t ]
     , [ shw $ nW  t ,     "o"     , shw $ nE  t ]
@@ -73,11 +74,11 @@ wild = Nothing
 
 -- NeighborhoodConstraint {{{
 
-tmMatch :: (Integral c) => NeighborhoodTileSet
+tmMatch :: (CoordType c) => NeighborhoodTileSet
   -> TileMap c -> Coord c -> Maybe TileIndex
 tmMatch ts tm = fmap fst . tsGetSingle . tmMatches ts tm
 
-tmMatches :: (Integral c) => NeighborhoodTileSet
+tmMatches :: (CoordType c) => NeighborhoodTileSet
   -> TileMap c -> Coord c -> NeighborhoodTileSet
 tmMatches ts tm = matchingNeighborhoods ts . tmNeighborhood tm
 
@@ -85,7 +86,7 @@ matchingNeighborhoods :: NeighborhoodTileSet
   -> Neighborhood -> NeighborhoodTileSet
 matchingNeighborhoods ts n = tsFilter (n ==) ts
 
-tmNeighborhood :: (Integral c) => TileMap c -> Coord c -> Neighborhood
+tmNeighborhood :: (CoordType c) => TileMap c -> Coord c -> Neighborhood
 tmNeighborhood tm = mkNeighborhood . tmSurrounding tm
 
 mkNeighborhood :: (Eq a) => Surrounding a -> Neighborhood
@@ -118,8 +119,7 @@ decodeNeighborhood8s = mkNeighborhoods . decodeNeighborhoods False
 decodeNeighborhoods :: Bool -> EncodedNeighborhoods -> [Neighborhood]
 decodeNeighborhoods isN4 =
     map decodeN
-  . concat
-  . map (map concat . transpose)
+  . concatMap (map concat . transpose)
   where
   decodeN [nw,n,ne,w,_,e,sw,s,se] = Neighborhood
     { nNW = decodeC nw

@@ -1,11 +1,9 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE PatternGuards #-}
 
 module Data.Grid where
 
-import Control.Monad.Random
 import Data.Points
 import Util
 
@@ -13,12 +11,10 @@ import Control.Applicative
 import Control.Arrow ((&&&))
 import Control.Lens
 import Control.Monad
-import Data.List (maximumBy, minimumBy)
-import Data.Maybe (fromMaybe)
+import Data.List (maximumBy, minimumBy, nub)
 import qualified Data.Map as M
 import qualified Data.Foldable as F
 import qualified Data.Traversable as T
-import qualified System.Random as R
 
 newtype Grid c a = Grid
   { grid :: M.Map (Coord c) a
@@ -37,39 +33,34 @@ gridFromMap = Grid
 emptyGrid :: Grid c a
 emptyGrid = gridFromMap M.empty
 
-mkRepeatGrid :: (Integral c) => Size c -> a -> Grid c a
+mkRepeatGrid :: (DiscreteCoord c) => Size c -> a -> Grid c a
 mkRepeatGrid sz a = gridFromList $ zip cs $ repeat a
   where
   cs = allCoords sz
 
-mkIotaGrid :: (Enum a, Num a, Integral c) => Size c -> Grid c a
+mkIotaGrid :: (DiscreteCoord c) => Size c -> Grid c TileIndex
 mkIotaGrid sz = gridFromList $ zip cs [0..]
   where
   cs = allCoords sz
 
-mkRandomGrid :: forall a c m. (MonadRandom m, Integral c, R.Random a)
-  => (a,a) -> Size c -> m (Grid c a)
-mkRandomGrid rng sz = do
-  a <- random
-  T.mapM f $ mkRepeatGrid sz a
-  where
-  f :: a -> m a
-  f = const $ randomR rng
-
 gridInsert :: (Ord c) => Coord c -> a -> Grid c a -> Grid c a
 gridInsert c = gridOnMap . M.insert c
 
-gridSize :: (Integral c) => Grid c a -> Size c
+gridUnion :: (Ord c) => Grid c a -> Grid c a -> Grid c a
+gridUnion g1 = gridFromMap . M.union (grid g1) . grid
+
+gridUnions :: (Ord c) => [Grid c a] -> Grid c a
+gridUnions = gridFromMap . M.unions . map grid
+
+gridSize :: (CoordType c) => Grid c a -> Size c
 gridSize =
     (+) 1
   . uncurry (-)
-  . over both Size
-  . (safeMaximum &&& safeMinimum)
-  . map (view coordV2)
-  . M.keys
-  . grid
+  . over both (view coordSize)
+  . (safeMaximumV2 0 &&& safeMinimumV2 0)
+  . gridCoords
 
-gridRows, gridCols :: (Integral c) => Grid c a -> c
+gridRows, gridCols :: (CoordType c) => Grid c a -> c
 gridRows = view height . gridSize
 gridCols = view  width . gridSize
 
@@ -84,7 +75,7 @@ gridOnMapM :: (Monad m) => (M.Map (Coord c) a -> m (M.Map (Coord c) b))
   -> Grid c a -> m (Grid c b)
 gridOnMapM f = return . gridFromMap <=< (f . grid)
 
-gridLookup :: (Ord c) => Grid c a -> Coord c -> Maybe a
+gridLookup :: (CoordType c) => Grid c a -> Coord c -> Maybe a
 gridLookup g c = M.lookup c $ grid g
 
 gridIndex :: (Ord c) => Grid c a -> Coord c -> a
@@ -96,8 +87,16 @@ gridFilter pr = gridOnMap $ M.filter pr
 gridFromList :: (Ord c) => [(Coord c,a)] -> Grid c a
 gridFromList = gridFromMap . M.fromList
 
+gridCoords :: Grid c a -> [Coord c]
+gridCoords = M.keys . grid
+
 gridContents :: Grid c a -> [(Coord c,a)]
 gridContents = M.assocs . grid
+
+gridList :: (CoordType c) => Grid c a -> [[Maybe a]]
+gridList g = map (map $ gridLookup g)
+  $ coordGrid
+  $ gridSize g
 
 gridDifference :: (Ord c) => Grid c a -> Grid c b -> Grid c a
 gridDifference = gridOnMap . M.difference . grid
@@ -126,6 +125,9 @@ gridMaximumValue g
 gridKeys :: Grid c a -> [Coord c]
 gridKeys = M.keys . grid
 
+gridValues :: Eq a => Grid c a -> [a]
+gridValues = nub . M.elems . grid
+
 gridTraverseWithKey :: (Applicative f) => (Coord c -> a -> f b)
   -> Grid c a -> f (Grid c b)
 gridTraverseWithKey f = gridOnMapA $ M.traverseWithKey f
@@ -151,6 +153,15 @@ foldrKeys = M.foldrWithKey . onlyIndex
 traverseKeys :: (Applicative f, Ord k)
   => (k -> f a) -> M.Map k b -> f (M.Map k a)
 traverseKeys = M.traverseWithKey . onlyIndex
+
+
+
+gridFoldrWithKey :: (Coord c -> b -> a -> a)
+  -> a -> Grid c b -> a
+gridFoldrWithKey f a = M.foldrWithKey f a . grid
+
+gridFoldrKeys :: (Coord c -> a -> a) -> a -> Grid c b -> a
+gridFoldrKeys f a = M.foldrWithKey (const . f) a . grid
 
 -- }}}
 
@@ -216,20 +227,8 @@ subMapByValue = M.filter . (==)
 
 -- Pretty Printing {{{
 
-ppGrid :: (Ord a, Integral c, Show a, Enum a) => Grid c a -> String
-ppGrid g = ppRows
-  [ [ pad s
-    | c <- [0..(sz^.width) - 1]
-    , let s = fromMaybe "" $ fmap show $ gridLookup g $ mkCoord c r
-    ]
-  | r <- [0..(sz^.height) - 1]
-  ]
-  where
-  blnk = replicate mxdigits ' '
-  sz = gridSize g
-  mxdigits = length mx
-  pad s = replicate (mxdigits - length s) ' ' ++ s
-  mx = maybe blnk (show . snd) $ gridMaximumValue g
+ppGrid :: (CoordType c, Ord a, Show a, Enum a) => Grid c a -> String
+ppGrid = ppSparseRows . gridList
 
 -- }}}
 

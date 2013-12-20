@@ -1,5 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE DeriveFunctor, DeriveFoldable, DeriveTraversable #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE PatternGuards #-}
 {-# LANGUAGE Rank2Types #-}
 {-# LANGUAGE OverloadedStrings #-}
 
@@ -10,10 +12,11 @@ import Util
 import Control.Applicative
 import Control.Lens
 import Control.Monad
-import Control.Monad.Trans.Random
 import Data.Aeson
 import Data.Foldable (Foldable(..))
-import Data.Maybe (mapMaybe)
+import Data.Ix
+import Data.List (elemIndex)
+import Data.Maybe (mapMaybe, fromMaybe)
 import Data.Monoid
 import Linear hiding (diagonal,perp)
 import qualified System.Random as R
@@ -35,18 +38,32 @@ instance (Ord c) => Ord (Coord c) where
     cCols = compare `on` view col
     cRows = compare `on` view row
 
+instance (CoordType c, Ix c) => Ix (Coord c) where
+  range (l,h)     = concat $ coordGridAt l (view coordSize $ h - l)
+  index lh c
+    | inRange lh c
+    , Just i <- elemIndex c $ range lh
+    = i
+    | otherwise
+    = error $ "Coord " ++ show c ++ " is not in range " ++ show lh
+  inRange (l,h) c = l^.col <= x && x <= h^.col &&
+                    l^.row <= y && y <= h^.row
+    where
+    x = c^.col
+    y = c^.row
+
 mkCoord :: c -> c -> Coord c
 mkCoord = Coord .:. V2
 
 instance R.Random c => R.Random (Coord c) where
-  random      = runRandom $
-        mkCoord
-    <$> random
-    <*> random
-  randomR rng = runRandom $
-        mkCoord
-    <$> randomR (rng & both %~ view col)
-    <*> randomR (rng & both %~ view row)
+  random g0 = (mkCoord x y,g2)
+    where
+    (x,g1) = R.random g0
+    (y,g2) = R.random g1
+  randomR rng g0 = (mkCoord x y,g2)
+    where
+    (x,g1) = R.randomR (rng & both %~ view col) g0
+    (y,g2) = R.randomR (rng & both %~ view row) g1
 
 instance FromJSON c => FromJSON (Coord c) where
   parseJSON (Object o) =
@@ -62,15 +79,6 @@ class IsCoord cd where
 instance IsCoord Coord where
   col = _x
   row = _y
-
-diagonal :: c -> Coord c
-diagonal c = mkCoord c c
-
-fromCoord :: (Coord c -> a) -> c -> c -> a
-fromCoord f = f .:. mkCoord
-
-toCoord :: (c -> c -> b) -> Coord c -> b
-toCoord f c = f (c ^. col) (c ^. row)
 
 -- Lenses, etc.
 
@@ -89,8 +97,36 @@ coordV2 = iso coord Coord
 colRow :: Iso' (Coord c) (c,c)
 colRow = iso (col `view2` row) (uncurry mkCoord)
 
-onCoord :: (Real c) => (V2 c -> V2 c) -> Coord c -> Coord c
+onCoord :: (CoordType c) => (V2 c -> V2 c) -> Coord c -> Coord c
 onCoord = under $ from coordV2
+
+sizeFromBounds :: (CoordType c) => (Coord c,Coord c) -> (Coord c,Size c)
+sizeFromBounds (l,h) = (l,view coordSize $ h - l)
+
+-- }}}
+
+-- Coord Classes {{{
+
+class (Ord c, Show c, Num c, Enum c) => CoordType c where
+instance CoordType Int where
+instance CoordType Integer where
+instance CoordType Float where
+instance CoordType Double where
+
+class (CoordType c, Integral c) => DiscreteCoord c where
+instance (CoordType c, Integral c) => DiscreteCoord c where
+
+class (CoordType c, Fractional c) => ContCoord c where
+instance (CoordType c, Fractional c) => ContCoord c where
+
+diagonal :: c -> Coord c
+diagonal c = mkCoord c c
+
+fromCoord :: (Coord c -> a) -> c -> c -> a
+fromCoord f = f .:. mkCoord
+
+toCoord :: (c -> c -> b) -> Coord c -> b
+toCoord f c = f (c ^. col) (c ^. row)
 
 -- }}}
 
@@ -109,14 +145,14 @@ mkSize :: c -> c -> Size c
 mkSize = Size .:. V2
 
 instance R.Random c => R.Random (Size c) where
-  random      = runRandom $
-        mkSize
-    <$> random
-    <*> random
-  randomR rng = runRandom $
-        mkSize
-    <$> randomR (rng & both %~ view  width)
-    <*> randomR (rng & both %~ view height)
+  random g0 = (mkSize w h,g2)
+    where
+    (w,g1) = R.random g0
+    (h,g2) = R.random g1
+  randomR rng g0 = (mkSize w h,g2)
+    where
+    (w,g1) = R.randomR (rng & both %~ view  width) g0
+    (h,g2) = R.randomR (rng & both %~ view height) g1
 
 instance FromJSON c => FromJSON (Size c) where
   parseJSON (Object o) =
@@ -159,7 +195,7 @@ onSize = underPrism sizeV2
 
 -- Coord Enumeration {{{
 
-coordInt :: (Integral c) => Size c -> Prism' Int (Coord c)
+coordInt :: (DiscreteCoord c) => Size c -> Prism' Int (Coord c)
 coordInt sz = prism' toInt fromInt
   where
   (w,h) = sz & width `view2` height
@@ -170,44 +206,53 @@ coordInt sz = prism' toInt fromInt
     where
     (r,c) = toEnum i `divMod` w
 
-coordOnInt :: (Integral c) => Size c -> (Int -> Int)
+coordOnInt :: (DiscreteCoord c) => Size c -> (Int -> Int)
   -> Coord c -> Maybe (Coord c)
 coordOnInt sz = underPrism $ coordInt sz
 
-allCoords :: (Integral c) => Size c -> [Coord c]
+allCoords :: (DiscreteCoord c) => Size c -> [Coord c]
 allCoords sz = enumCoords sz [0..lexMaxBound sz]
 
-coordGrid :: (Integral c) => Size c -> [[Coord c]]
-coordGrid = coordMat Nothing
+coordGrid :: (CoordType c) => Size c -> [[Coord c]]
+coordGrid = coordArray Nothing Nothing
 
-coordGridChunks :: (Integral c) => Size c -> Size c -> [[Coord c]]
-coordGridChunks = coordMat . Just
+coordGridChunksAt :: (CoordType c)
+  => Size c -> Coord c -> Size c -> [[Coord c]]
+coordGridChunksAt chunkSize origin =
+  coordArray (Just chunkSize) (Just origin)
 
-coordMat :: (Integral c) => Maybe (Size c) -> Size c -> [[Coord c]]
-coordMat mt sz =
-  [ [ mkCoord x y
-    | x <- xs $ view width <$> mt
-    ]
-  | y <- ys $ view height <$> mt
-  ]
+coordGridChunks :: (CoordType c)
+  => Size c -> Size c -> [[Coord c]]
+coordGridChunks chunkSize = coordArray (Just chunkSize) Nothing
+
+coordGridAt :: (CoordType c)
+  => Coord c -> Size c -> [[Coord c]]
+coordGridAt origin = coordArray Nothing (Just origin)
+
+coordArray :: (CoordType c) => Maybe (Size c) -> Maybe (Coord c)
+  -> Size c -> [[Coord c]]
+coordArray chunkSize origin arrSize =
+  [ [ mkCoord x y | x <- view width cs ] | y <- view height cs ]
   where
-  (w,h) = view widthHeight $ sz - 1
-  xs = maybe [0..w] $ \tw -> [0,tw..w]
-  ys = maybe [0..h] $ \th -> [0,th..h]
+  ori = view coordSize $ fromMaybe 0 origin
+  as = arrSize - 1
+  cs = case chunkSize of
+    Just sz -> enumFromThenTo <$> ori <*> (sz + ori) <*> (as + ori)
+    Nothing -> enumFromTo     <$> ori                <*> (as + ori)
 
-enumCoords :: (Integral c) => Size c -> [Int] -> [Coord c]
+enumCoords :: (DiscreteCoord c) => Size c -> [Int] -> [Coord c]
 enumCoords = mapMaybe . indexCoord
 
-coordIndex :: (Integral c) => Size c -> Coord c -> Int
+coordIndex :: (DiscreteCoord c) => Size c -> Coord c -> Int
 coordIndex = review . coordInt
 
-indexCoord :: (Integral c) => Size c -> Int -> Maybe (Coord c)
+indexCoord :: (DiscreteCoord c) => Size c -> Int -> Maybe (Coord c)
 indexCoord = preview . coordInt
 
 lexMinBound :: Size c -> Int
 lexMinBound _  = 0
 
-lexMaxBound :: (Integral c) => Size c -> Int
+lexMaxBound :: (DiscreteCoord c) => Size c -> Int
 lexMaxBound sz = coordIndex sz $ Coord $ size (sz - 1)
 
 coordSize :: Iso (Coord c) (Coord c) (Size c) (Size c)
@@ -240,6 +285,16 @@ zipWithV2 = liftI2
 
 swapV2 :: (R2 f) => f a -> f a
 swapV2 v = (_x .~ (v ^. _y)) . (_y .~ (v ^._x)) $ v
+
+-- }}}
+
+-- Pretty Printing {{{
+
+ppCoord :: Show c => Coord c -> String
+ppCoord c = show (c^.col) ++ "," ++ show (c^.row)
+
+ppSize :: Show c => Size c -> String
+ppSize s = show (s^.width) ++ "x" ++ show (s^.height)
 
 -- }}}
 
